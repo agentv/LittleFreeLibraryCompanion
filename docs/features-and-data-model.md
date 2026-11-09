@@ -84,6 +84,7 @@ Visit 1───* Comment 1───* Attachment (photo, via comment_id)
 - id, visit_id, comment_id (nullable; set when it belongs to a comment)
 - kind: `photo` | `audio`
 - storage_path (remote, once uploaded), local_uri (on device)
+- thumbnail_storage_path, thumbnail_local_uri (thumbnail made on the phone, 320 px)
 - mime_type, size_bytes
 - width, height (photo); duration_s (audio)
 - role: `shelf` | `establishing` | `location` (nullable; photos only; at most one per role per visit)
@@ -147,3 +148,9 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 - The app repo is client only. Backend/infrastructure (self-hosted Supabase, S3, backups, auth email) is a separate project. Contract: docs/backend-requirements.md in the app repo, including a section for requirements the backend project sends back.
 - Vendor-dependent parts are swappable subsystems behind interfaces: **sync** (local store, row sync, media upload) and **membership** (sign-in, roles, member status, permissions, curating who contributes).
 - Design work lives in a local-only design/ folder (gitignored); copy kept in /mnt/project-files/design/.
+
+## 10. More decisions (2026-11-09)
+
+- New libraries do not need admin approval; any active steward can add one, admins can edit or remove it.
+- Photo thumbnails are made on the phone and uploaded with each photo.
+- The backend keeps a rich change history: who changed what, when, and each field's before and after values (append-only). How long it's kept and who can see it is still open.

@@ -97,6 +97,10 @@ export interface Attachment {
   storagePath: string | null;
   /** File on the device (device-only field). */
   localUri: string | null;
+  /** Photo thumbnail, made on the phone and uploaded alongside the photo. */
+  thumbnailStoragePath: string | null;
+  /** Device-only field. */
+  thumbnailLocalUri: string | null;
   mimeType: string;
   sizeBytes: number | null;
   width: number | null;
@@ -111,6 +115,25 @@ export interface Attachment {
   uploadStatus: UploadStatus;
   createdAt: ISODateTime;
   deletedAt: ISODateTime | null;
+}
+
+export type ChangeAction = 'create' | 'update' | 'delete';
+
+/**
+ * One entry in the rich change history (written by the backend, read-only
+ * in the app). See docs/backend-requirements.md R21.
+ */
+export interface ChangeHistoryEntry {
+  id: UUID;
+  table: 'libraries' | 'visits' | 'comments' | 'attachments' | 'members';
+  recordId: UUID;
+  action: ChangeAction;
+  changedBy: UUID;
+  changedAt: ISODateTime;
+  /** The time on the device that made the change, if known. */
+  deviceTime: ISODateTime | null;
+  /** Field name -> before and after values. Empty for create/delete. */
+  changes: Record<string, { before: unknown; after: unknown }>;
 }
 
 /** Edit rule: you can edit what you created; admins can edit anything. */

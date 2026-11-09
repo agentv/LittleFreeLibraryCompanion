@@ -8,3 +8,6 @@ export const VOICE_NOTE_COUNTDOWN_SECONDS = 10;
 
 /** Longest edge, in pixels, that photos are resized to before upload. */
 export const PHOTO_MAX_EDGE_PX = 1600;
+
+/** Longest edge, in pixels, of thumbnails made on the phone and uploaded with each photo. */
+export const THUMBNAIL_MAX_EDGE_PX = 320;
