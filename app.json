@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "lfl-steward-companion",
+    "name": "LFL Steward Companion",
     "slug": "lfl-steward-companion",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
