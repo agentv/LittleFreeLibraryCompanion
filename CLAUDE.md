@@ -17,7 +17,6 @@ LFL Steward Companion: a React Native + Expo (TypeScript) app for Little Free Li
 - Location: the check-in never blocks on location; visits may have no position. New libraries need a position from GPS or a pin placed on a map. Handle permission denied, location off, no fix, low accuracy, stale and mocked positions (`src/location/index.ts`).
 - Addresses: the phone never geocodes. It sends coordinates; the server fills the address during sync (`addressStatus` pending → resolved/failed). Never overwrite a manual address.
 - Devices: every device registers with a hardware-backed key and App Attest / Play Integrity; requests are signed; devices can be revoked (`docs/device-trust.md`, proposed). Every record carries `createdOnDeviceId`.
-
 - Membership curates contributors: members are `pending` until an admin approves them, then `active`; admins can `suspend`. Only active members can submit.
 - Users are stewards and admins. Everyone signed in can see every library. You can edit what you created; admins can edit anything (`canEdit` in `src/types/models.ts`).
 - Data: Library → Visit → Attachment (photo or audio) and Comment. Photo roles: shelf, establishing, location (at most one per role per visit). Condition fields live on Visit.
