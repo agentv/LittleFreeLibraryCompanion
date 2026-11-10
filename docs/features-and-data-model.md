@@ -105,7 +105,7 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 - **Retries with backoff**, resume after the app restarts, and a visible "3 items waiting to upload" indicator.
 - **Conflicts.** MVP is mostly one steward per library and data is append-heavy (new visits, new photos), so "last write wins" per field on Library and Comment is enough. Deletes are soft (deleted_at) so they sync cleanly.
 - **Permissions.** Camera, microphone, location (while in use only), photo library. Ask at the moment each is first needed.
-- **Geocoding needs network.** Offline, save GPS now and fill the address in when back online (marked `geocoded`), unless the steward typed it.
+- **Addresses are filled in by the server during sync** (decided 2026-11-10). The phone sends coordinates, accuracy and how they were obtained; the library shows "Address coming soon" until the server returns it. A typed address is never overwritten.
 - **Server security.** Row-level security: any signed-in steward can read everything and create visits; update/delete only if `created_by`/`user_id` = you, or your role is `admin`.
 
 ## 5. Decisions (2026-11-09)
@@ -154,3 +154,11 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 - New libraries do not need admin approval; any active steward can add one, admins can edit or remove it.
 - Photo thumbnails are made on the phone and uploaded with each photo.
 - The backend keeps a rich change history: who changed what, when, and each field's before and after values (append-only). How long it's kept and who can see it is still open.
+
+## 11. Location, server and devices (2026-11-10)
+
+- **Location problems are handled on the phone:** permission denied, location turned off, no fix, low accuracy (over 50 m), stale cached position, mocked position. Each shows a plain message and offers retry, open Settings, or place the library on a map. A check-in never blocks on location; visits can be saved without a position. New libraries need a position (GPS or map pin).
+- **Address lookup on the server during sync**, using a self-hostable geocoder (no per-request fees).
+- New fields: Library `location_source` (gps / last_known / manual_pin) and `address_status` (pending / resolved / failed / manual); Visit `location_source`; every record `created_on_device_id`; new **Device** table.
+- **Server subsystem** on the client: the single, replaceable path to the backend.
+- **Device verification and authentication:** proposed design in the app repo's docs/device-trust.md (hardware-backed device key, App Attest / Play Integrity, signed requests, revocable devices). Six open questions there.

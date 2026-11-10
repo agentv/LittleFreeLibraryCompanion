@@ -10,6 +10,7 @@ export type {
   Permission,
   Session,
 } from './types';
+export type { DeviceAttestation, DeviceIdentity, DeviceKeyStore, DeviceRegistry } from './devices';
 
 import type { Member, Permission } from './types';
 

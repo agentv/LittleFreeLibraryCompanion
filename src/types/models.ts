@@ -27,6 +27,22 @@ export interface User {
 
 export type AddressSource = 'geocoded' | 'manual';
 
+/**
+ * Where an address stands. The phone never geocodes; it sends coordinates
+ * and the server fills the address in during sync (backend R22-R24).
+ * pending: waiting for the server. resolved: server filled it in.
+ * failed: server couldn't find one (steward may type it). manual: typed
+ * by a person; the server must never overwrite it.
+ */
+export type AddressStatus = 'pending' | 'resolved' | 'failed' | 'manual';
+
+/**
+ * How a position was obtained. gps: a fresh fix from the phone.
+ * last_known: the phone's cached position (may be stale).
+ * manual_pin: a person placed it on a map.
+ */
+export type LocationSource = 'gps' | 'last_known' | 'manual_pin';
+
 export interface Library {
   id: UUID;
   name: string;
@@ -35,6 +51,7 @@ export interface Library {
   latitude: number;
   longitude: number;
   locationAccuracyM: number | null;
+  locationSource: LocationSource;
   addressLine: string | null;
   city: string | null;
   county: string | null;
@@ -42,9 +59,12 @@ export interface Library {
   postalCode: string | null;
   country: string | null;
   addressSource: AddressSource;
+  addressStatus: AddressStatus;
   /** Falls back to the latest establishing shot when null. */
   coverPhotoId: UUID | null;
   createdBy: UUID;
+  /** Device that created the record (see docs/device-trust.md). */
+  createdOnDeviceId: UUID;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
   deletedAt: ISODateTime | null;
@@ -58,9 +78,12 @@ export interface Visit {
   libraryId: UUID;
   userId: UUID;
   visitedAt: ISODateTime;
+  /** Null when no position could be obtained (location problems are allowed). */
   latitude: number | null;
   longitude: number | null;
   locationAccuracyM: number | null;
+  locationSource: LocationSource | null;
+  createdOnDeviceId: UUID;
   /** Condition check (optional wizard step). */
   stockLevel: StockLevel | null;
   condition: ConditionLevel | null;
@@ -75,6 +98,7 @@ export interface Comment {
   id: UUID;
   visitId: UUID;
   userId: UUID;
+  createdOnDeviceId: UUID;
   body: string;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
@@ -91,6 +115,7 @@ export interface Attachment {
   visitId: UUID;
   /** Set when the attachment belongs to a comment. */
   commentId: UUID | null;
+  createdOnDeviceId: UUID;
   kind: AttachmentKind;
   role: PhotoRole | null;
   /** Object key in S3, once uploaded. */
@@ -117,6 +142,30 @@ export interface Attachment {
   deletedAt: ISODateTime | null;
 }
 
+/**
+ * A phone or tablet registered to a member (docs/device-trust.md).
+ * pending: registered, not yet trusted. trusted: may sync.
+ * revoked: blocked; its tokens no longer work.
+ */
+export type DeviceStatus = 'pending' | 'trusted' | 'revoked';
+
+export interface Device {
+  id: UUID;
+  memberId: UUID;
+  /** Public half of a key pair kept in the phone's secure hardware. */
+  publicKey: string;
+  platform: 'ios' | 'android';
+  model: string | null;
+  appVersion: string;
+  /** Result of App Attest / Play Integrity at registration. */
+  attestation: 'passed' | 'failed' | 'unavailable';
+  status: DeviceStatus;
+  registeredAt: ISODateTime;
+  lastSeenAt: ISODateTime | null;
+  revokedAt: ISODateTime | null;
+  revokedBy: UUID | null;
+}
+
 export type ChangeAction = 'create' | 'update' | 'delete';
 
 /**
@@ -125,10 +174,12 @@ export type ChangeAction = 'create' | 'update' | 'delete';
  */
 export interface ChangeHistoryEntry {
   id: UUID;
-  table: 'libraries' | 'visits' | 'comments' | 'attachments' | 'members';
+  table: 'libraries' | 'visits' | 'comments' | 'attachments' | 'members' | 'devices';
   recordId: UUID;
   action: ChangeAction;
   changedBy: UUID;
+  /** Device the change came from, when it came from the app. */
+  deviceId: UUID | null;
   changedAt: ISODateTime;
   /** The time on the device that made the change, if known. */
   deviceTime: ISODateTime | null;

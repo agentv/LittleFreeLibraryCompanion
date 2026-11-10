@@ -9,10 +9,14 @@ LFL Steward Companion: a React Native + Expo (TypeScript) app for Little Free Li
 ## Architecture rules
 
 - This repo is the **client only**. The backend/infrastructure is a separate project. Anything we need from it goes in `docs/backend-requirements.md`; anything it asks of us goes in that file's "Requirements from the backend" section. Keep both current.
-- Subsystems must stay replaceable: `src/sync` (local store, row sync, media upload) and `src/membership` (sign-in, roles, member status, permissions). Each has a contract in `types.ts` and a public `index.ts`. Vendor code (Supabase, S3, SQLite) goes only in `src/<subsystem>/adapters/<vendor>/`. Screens import only from a subsystem's `index.ts`.
+- Subsystems must stay replaceable: `src/sync` (local store, row sync, media upload), `src/membership` (sign-in, roles, member status, permissions, device trust), `src/server` (the only path to the backend: base URL, API version, credentials, request signing, error codes) and `src/location` (position plus problem handling). Each has a contract in `types.ts` and a public `index.ts`. Vendor code (Supabase, S3, SQLite) goes only in `src/<subsystem>/adapters/<vendor>/`. Screens import only from a subsystem's `index.ts`.
 - `design/` is gitignored on purpose; don't add it to the repo.
 
 ## Key decisions
+
+- Location: the check-in never blocks on location; visits may have no position. New libraries need a position from GPS or a pin placed on a map. Handle permission denied, location off, no fix, low accuracy, stale and mocked positions (`src/location/index.ts`).
+- Addresses: the phone never geocodes. It sends coordinates; the server fills the address during sync (`addressStatus` pending → resolved/failed). Never overwrite a manual address.
+- Devices: every device registers with a hardware-backed key and App Attest / Play Integrity; requests are signed; devices can be revoked (`docs/device-trust.md`, proposed). Every record carries `createdOnDeviceId`.
 
 - Membership curates contributors: members are `pending` until an admin approves them, then `active`; admins can `suspend`. Only active members can submit.
 - Users are stewards and admins. Everyone signed in can see every library. You can edit what you created; admins can edit anything (`canEdit` in `src/types/models.ts`).
@@ -29,7 +33,9 @@ LFL Steward Companion: a React Native + Expo (TypeScript) app for Little Free Li
 - `src/types/models.ts`: data model types.
 - `src/config/limits.ts`: product limits.
 - `src/sync/`: sync subsystem (contract only so far; adapters not built).
-- `src/membership/`: membership subsystem (contract and permission rules; adapters not built).
+- `src/membership/`: membership subsystem (contract, permission rules, device trust contracts in `devices.ts`; adapters not built).
+- `src/server/`: server subsystem (contract only).
+- `src/location/`: location subsystem (contract and problem handling; adapter not built).
 - `docs/`: planning docs. `design/`: local-only design notes.
 
 ## Commands
