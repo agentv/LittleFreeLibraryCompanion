@@ -56,11 +56,11 @@ Status: draft, updated 2026-11-13 (backend language added).
 
 ### 5. Location and addresses
 
-- R22. **Address lookup happens on the server during sync.** The app sends only coordinates, accuracy and location source. When a library arrives (or its coordinates change) with `address_status = pending`, the server reverse-geocodes it, fills the address fields, sets `address_status` to `resolved` (or `failed`), and returns it on the next pull.
-- R23. Never overwrite an address a person typed (`address_status = manual`). If coordinates change on a manual address, keep the address and flag it for review.
-- R24. Address lookup uses a **small hosted reverse-geocoding service** (decided 2026-11-13; coverage can't be limited to one region, so self-hosting is out). It sits behind a replaceable geocoder interface in the Node service, so the provider can be swapped. Every result is **saved in our database** with the library, and lookups are cached by rounded coordinates so the same spot is never paid for twice. The provider's API key stays on the server. Choose a provider whose terms allow storing results permanently (some don't), with a free or low-cost tier that covers our volume.
+- R22. **Nice-to-have, not a blocker (2026-11-13): address suggestions.** Stewards are responsible for entering each library's street address. As a convenience, when a library syncs with coordinates, the server may look up likely addresses and return up to 5 **suggestions** (ranked) on the next pull. Coordinates often match several addresses, so suggestions are only offered; the steward picks, edits or ignores them. This feature can be dropped at any time without affecting anything else.
+- R23. The server **never writes or changes a library's address**. Only a steward (or an admin) sets it. Suggestions live in their own table, separate from the library.
+- R24. If built, suggestions come from a **small hosted reverse-geocoding service** (coverage can't be limited to one region, so self-hosting is out), behind a replaceable geocoder interface in the Node service. Results are stored and cached by rounded coordinates so the same spot is never paid for twice. The API key stays on the server. The provider's terms must allow storing results.
 - R25. Location sanity checks: flag (don't reject) visits more than 150 m from their library, positions reported as mocked, and low-accuracy fixes (over 50 m), so admins can review.
-- R26. Accept visits with no position. Libraries always have a position, from GPS or placed on a map (`location_source = manual_pin`).
+- R26. Accept visits with no position. Libraries always have a position, from GPS or placed on a map (`location_source = manual_pin`). A library may be saved without an address (`address_status = missing`); the app reminds the steward to add it.
 
 ### 6. Devices (see [device-trust.md](device-trust.md))
 
@@ -88,5 +88,5 @@ The backend project adds items here as it makes decisions that affect the app (f
 
 - Q4. How long is change history kept, and do stewards see a library's history or only admins?
 - Q6. ~~Where does Postgres run?~~ Decided 2026-11-13: in the trimmed Supabase stack on the resized existing EC2 server, alongside WordPress (see Context).
-- Q7. ~~Address lookup service?~~ Decided 2026-11-13: small hosted reverse-geocoding service behind a swappable interface, results stored in our database (R24).
+- Q7. ~~Address lookup service?~~ Decided 2026-11-13: small hosted service behind a swappable interface (R24); the whole feature is a nice-to-have (R22).
 - Q5. Check-ins from a revoked device that never synced: reject, or hold for admin review (recommended)? See [device-trust.md](device-trust.md).

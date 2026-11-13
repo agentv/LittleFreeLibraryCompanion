@@ -3,7 +3,7 @@
  * vendor code lives in src/sync/adapters/<vendor>/.
  * See docs/architecture.md and docs/backend-requirements.md.
  */
-import type { Attachment, Comment, Library, UUID, Visit } from '../types/models';
+import type { AddressSuggestion, Attachment, Comment, Library, UUID, Visit } from '../types/models';
 
 /** Tables that sync between device and backend. */
 export interface SyncedRecords {
@@ -40,7 +40,12 @@ export interface RemoteSync {
   /** Send local changes. Returns ids the server rejected, with reasons. */
   push(changes: ChangeSet): Promise<{ rejected: { id: UUID; reason: string }[] }>;
   /** Fetch changes since a cursor the server gave us last time. */
-  pull(cursor: string | null): Promise<{ changes: ChangeSet; cursor: string }>;
+  pull(cursor: string | null): Promise<{
+    changes: ChangeSet;
+    cursor: string;
+    /** Nice-to-have (FEATURES.addressSuggestions); absent or empty is normal. */
+    addressSuggestions?: AddressSuggestion[];
+  }>;
 }
 
 /** Uploads and fetches photo/audio files. One implementation per storage service. */

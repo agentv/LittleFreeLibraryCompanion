@@ -105,7 +105,7 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 - **Retries with backoff**, resume after the app restarts, and a visible "3 items waiting to upload" indicator.
 - **Conflicts.** MVP is mostly one steward per library and data is append-heavy (new visits, new photos), so "last write wins" per field on Library and Comment is enough. Deletes are soft (deleted_at) so they sync cleanly.
 - **Permissions.** Camera, microphone, location (while in use only), photo library. Ask at the moment each is first needed.
-- **Addresses are filled in by the server during sync** (decided 2026-11-10). The phone sends coordinates, accuracy and how they were obtained; the library shows "Address coming soon" until the server returns it. A typed address is never overwritten.
+- **Addresses are the steward's job** (updated 2026-11-13). The steward types or confirms the address. As a nice-to-have, the server may send back suggested addresses after sync; the steward picks, edits or ignores them. The server never sets an address itself.
 - **Server security.** Row-level security: any signed-in steward can read everything and create visits; update/delete only if `created_by`/`user_id` = you, or your role is `admin`.
 
 ## 5. Decisions (2026-11-09)
@@ -170,3 +170,11 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 - Device trust expires 30 days after the last verification; the app renews it quietly before then. Trust also ends when the device is removed.
 - Device gets `last_verified_at` and `trust_expires_at`.
 - Still open: what to do with unsynced check-ins from a revoked device (recommended: hold for admin review).
+
+## 13. Address suggestions are a nice-to-have (2026-11-13)
+
+- Stewards are responsible for every library's street address. Coordinates often match several addresses, so the steward always picks or confirms one.
+- Nice-to-have: after a library syncs, the server may offer up to 5 suggested addresses (hosted lookup service). The app shows "Suggested addresses" under the address field; tap one to fill the field, then edit or confirm.
+- It can be dropped at any time: a single switch turns it off, and nothing else depends on it.
+- A library can be saved without an address; it shows "Address needed" until the steward adds one.
+- Data model: Library `address_source` is typed or suggestion; `address_status` is missing or confirmed. Suggestions live in their own AddressSuggestion table.

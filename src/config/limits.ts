@@ -1,3 +1,12 @@
+/**
+ * Feature switches. Optional features must be removable by flipping
+ * their switch, with no effect on the core flow.
+ */
+export const FEATURES = {
+  /** Nice-to-have: server-suggested street addresses the steward confirms. */
+  addressSuggestions: true,
+} as const;
+
 /** Product limits agreed in planning (see docs/features-and-data-model.md). */
 
 /** Voice notes stop recording automatically at this length. */

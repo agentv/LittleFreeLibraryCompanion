@@ -25,16 +25,20 @@ export interface User {
   createdAt: ISODateTime;
 }
 
-export type AddressSource = 'geocoded' | 'manual';
+/**
+ * The steward is always responsible for a library's street address.
+ * typed: entered by hand. suggestion: the steward picked one of the
+ * server's suggestions (nice-to-have feature, see AddressSuggestion)
+ * and confirmed or edited it.
+ */
+export type AddressSource = 'typed' | 'suggestion';
 
 /**
- * Where an address stands. The phone never geocodes; it sends coordinates
- * and the server fills the address in during sync (backend R22-R24).
- * pending: waiting for the server. resolved: server filled it in.
- * failed: server couldn't find one (steward may type it). manual: typed
- * by a person; the server must never overwrite it.
+ * missing: no address yet (the library can be saved; the app reminds the
+ * steward). confirmed: a steward entered or confirmed it.
+ * Nothing else may set or change the address.
  */
-export type AddressStatus = 'pending' | 'resolved' | 'failed' | 'manual';
+export type AddressStatus = 'missing' | 'confirmed';
 
 /**
  * How a position was obtained. gps: a fresh fix from the phone.
@@ -58,7 +62,8 @@ export interface Library {
   region: string | null;
   postalCode: string | null;
   country: string | null;
-  addressSource: AddressSource;
+  /** Null while addressStatus is missing. */
+  addressSource: AddressSource | null;
   addressStatus: AddressStatus;
   /** Falls back to the latest establishing shot when null. */
   coverPhotoId: UUID | null;
@@ -140,6 +145,29 @@ export interface Attachment {
   uploadStatus: UploadStatus;
   createdAt: ISODateTime;
   deletedAt: ISODateTime | null;
+}
+
+/**
+ * NICE-TO-HAVE: a possible street address the server found for a
+ * library's coordinates (backend R22). Coordinates often match several
+ * addresses, so these are only offered; the steward picks, edits or
+ * ignores them. The app must work fully without any suggestions.
+ */
+export interface AddressSuggestion {
+  id: UUID;
+  libraryId: UUID;
+  /** 1 = most likely. */
+  rank: number;
+  label: string;
+  addressLine: string | null;
+  city: string | null;
+  county: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+  /** Distance from the library's coordinates, if the provider gives it. */
+  distanceM: number | null;
+  createdAt: ISODateTime;
 }
 
 /**
