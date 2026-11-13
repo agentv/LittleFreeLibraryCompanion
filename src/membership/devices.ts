@@ -39,8 +39,13 @@ export interface DeviceRegistry {
     model: string | null;
     appVersion: string;
   }): Promise<Device>;
-  /** Current status of this device (trusted, pending, revoked). */
-  status(deviceId: UUID): Promise<DeviceStatus>;
+  /**
+   * Repeat the handshake (new challenge, signature, attestation) to renew
+   * trust before the 30-day expiry, or after a fresh sign-in once expired.
+   */
+  reverify(input: { deviceId: UUID; signedChallenge: string; attestationToken: string | null }): Promise<Device>;
+  /** Current status of this device (trusted, pending, revoked) and when trust expires. */
+  status(deviceId: UUID): Promise<{ status: DeviceStatus; trustExpiresAt: string | null }>;
   /** The member's own devices, so they can revoke a lost phone. */
   listMine(): Promise<Device[]>;
   revoke(deviceId: UUID): Promise<void>;
@@ -50,8 +55,11 @@ export interface DeviceRegistry {
 export interface DeviceIdentity {
   /** Stable id for this install, created on first run. */
   getDeviceId(): Promise<UUID>;
-  /** Register if needed and report whether this device may sync. */
-  ensureRegistered(): Promise<DeviceStatus>;
+  /**
+   * Register if needed, renew if trust expires within DEVICE_TRUST.RENEW_BEFORE_DAYS,
+   * and report whether this device may sync.
+   */
+  ensureTrusted(): Promise<DeviceStatus>;
   /** Signature over a request, used by the server subsystem. */
   signRequest(canonical: string): Promise<string>;
 }

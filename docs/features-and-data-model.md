@@ -17,7 +17,7 @@ Date: 2026-11-09
 - **Photo roles.** Three suggested photos on each visit, shown as slots to fill: **Shelf** (book titles readable), **Establishing shot** (the library as you approach from the road), and **Location** (street address placard or the crossroads street signs). The steward can take as many photos as they like and picks which one fills each slot. Slots are encouraged but not required. The library page shows the most recent photo for each role, and the latest establishing shot is the library's cover by default.
 - **Condition check on each visit.** Optional one-tap answers: book stock (empty / low / good / overflowing), condition (good / needs cleaning / damaged), door and latch working (yes / no), anything removed (yes / no). Library list shows the latest condition, and admins can filter for libraries that need attention.
 - **Works offline.** Everything above can be captured with no signal and syncs later.
-- **Sign-in.** Simple account (email magic link or Apple/Google sign-in) so data backs up and follows you to a new phone.
+- **Sign-in.** Stewards create their account first on a web sign-up form (outside the app); the app only signs in, by email link or code, with a link to the form.
 
 ### Later
 - Read book titles from shelf photos automatically.
@@ -162,3 +162,11 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 - New fields: Library `location_source` (gps / last_known / manual_pin) and `address_status` (pending / resolved / failed / manual); Visit `location_source`; every record `created_on_device_id`; new **Device** table.
 - **Server subsystem** on the client: the single, replaceable path to the backend.
 - **Device verification and authentication:** proposed design in the app repo's docs/device-trust.md (hardware-backed device key, App Attest / Play Integrity, signed requests, revocable devices). Six open questions there.
+
+## 12. Accounts and device trust (2026-11-13)
+
+- Accounts are created on a web sign-up form run by the backend, before using the app. New accounts wait for admin approval.
+- A device is trusted as soon as Apple/Google attestation passes; if it fails, it stays pending for an admin. No limit on devices per member. Shared phones are not supported.
+- Device trust expires 30 days after the last verification; the app renews it quietly before then. Trust also ends when the device is removed.
+- Device gets `last_verified_at` and `trust_expires_at`.
+- Still open: what to do with unsynced check-ins from a revoked device (recommended: hold for admin review).

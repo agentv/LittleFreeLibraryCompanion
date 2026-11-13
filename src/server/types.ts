@@ -45,6 +45,8 @@ export interface ServerError {
   message: string;
   /** When to try again, if the server said. */
   retryAfterMs?: number;
+  /** For device_untrusted: why. expired means re-verify (30-day trust lapsed). */
+  deviceReason?: 'pending_approval' | 'attestation_failed' | 'expired';
 }
 
 export type ServerResult<T> = { ok: true; data: T } | { ok: false; error: ServerError };

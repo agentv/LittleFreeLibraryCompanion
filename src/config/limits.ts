@@ -25,3 +25,11 @@ export const LOCATION = {
 
 /** Longest edge, in pixels, of thumbnails made on the phone and uploaded with each photo. */
 export const THUMBNAIL_MAX_EDGE_PX = 320;
+
+/** Device trust (docs/device-trust.md). */
+export const DEVICE_TRUST = {
+  /** Device credentials expire this long after the last verification. */
+  VALID_DAYS: 30,
+  /** Start quiet renewal this many days before expiry. */
+  RENEW_BEFORE_DAYS: 5,
+} as const;

@@ -144,8 +144,10 @@ export interface Attachment {
 
 /**
  * A phone or tablet registered to a member (docs/device-trust.md).
- * pending: registered, not yet trusted. trusted: may sync.
- * revoked: blocked; its tokens no longer work.
+ * pending: registered, not yet trusted (attestation failed or unavailable;
+ * an admin can approve). trusted: may sync until trustExpiresAt.
+ * revoked: removed by its member or an admin; its tokens no longer work.
+ * One member per device: shared phones are not supported.
  */
 export type DeviceStatus = 'pending' | 'trusted' | 'revoked';
 
@@ -161,6 +163,10 @@ export interface Device {
   attestation: 'passed' | 'failed' | 'unavailable';
   status: DeviceStatus;
   registeredAt: ISODateTime;
+  /** Last successful challenge + attestation. */
+  lastVerifiedAt: ISODateTime | null;
+  /** Trust ends here (30 days after lastVerifiedAt) unless renewed. */
+  trustExpiresAt: ISODateTime | null;
   lastSeenAt: ISODateTime | null;
   revokedAt: ISODateTime | null;
   revokedBy: UUID | null;

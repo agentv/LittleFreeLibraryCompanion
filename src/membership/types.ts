@@ -33,8 +33,14 @@ export type Permission =
   | 'member.approve'
   | 'member.suspend';
 
-/** Sign-in and account lifecycle. One implementation per auth provider. */
+/**
+ * Sign-in only. Accounts are created beforehand on the backend's web
+ * sign-up form (backend R11a); the app has no sign-up screen.
+ * One implementation per auth provider.
+ */
 export interface AuthProvider {
+  /** Web sign-up form to open in the browser for people without an account. */
+  readonly signUpUrl: string;
   /** Send a sign-in link or code to the email address. */
   requestSignIn(email: string): Promise<void>;
   /** Complete sign-in from the link/code. */

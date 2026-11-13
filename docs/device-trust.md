@@ -1,6 +1,6 @@
 # Device verification and authentication
 
-Status: proposed design, 2026-11-10. Open questions at the end.
+Status: decided 2026-11-13 (Vincent), except open question 4.
 
 ## Goal
 
@@ -17,11 +17,16 @@ This lets us curate inputs, cut off a lost or misused phone without touching the
 
 - The app creates a **device id** (UUID) and a **key pair** in the phone's secure hardware (iOS Secure Enclave / Android Keystore). The private key never leaves the phone.
 
-### 2. Sign in: the member proves who they are
+### 2. Account first, outside the app
+
+- Stewards create their account **before** using the app, through a **web sign-up form** run by the backend (it works in a phone's browser too). New accounts are `pending` until an admin approves them (membership curation).
+- The app has **no sign-up screen**. It only signs in to an existing account. A "Don't have an account?" link opens the web form in the browser.
+
+### 3. Sign in: the member proves who they are
 
 - Email magic link or one-time code (backend R11). The server returns a short-lived **access token** and a **refresh token**.
 
-### 3. Registration: the device proves what it is
+### 4. Registration: the device proves what it is
 
 1. The app asks the server for a one-time **challenge**.
 2. It signs the challenge with the device's private key.
@@ -29,13 +34,21 @@ This lets us curate inputs, cut off a lost or misused phone without touching the
 4. It sends: device id, public key, signed challenge, attestation token, platform, model and app version.
 5. The server checks the signature and the attestation, stores the device against the member, and sets its status.
 
-### 4. Trust rule (proposed)
+### 5. Trust rule (decided)
 
-- Attestation passed and the member is active → device is **trusted** immediately.
-- Attestation failed or unavailable (emulator, rooted phone, very old phone) → device is **pending** until an admin approves it.
-- A pending member's device is registered but can't submit anything until the member is approved (membership rule).
+- Attestation passed → device is **trusted** immediately. No admin step.
+- Attestation failed or unavailable (emulator, rooted phone, very old phone) → device stays **pending** until an admin approves it.
+- **No limit** on devices per member.
+- A pending member's device can register, but nothing can be submitted until the member is approved (membership rule).
+- **Shared phones are not supported.** One phone belongs to one member.
 
-### 5. Every request
+### 6. Trust lasts 30 days
+
+- A device's credentials **expire 30 days** after it was last verified. After that the server treats it as untrusted until it verifies again.
+- Trust also ends when the device is **removed** (by its member or an admin).
+- Renewal: while the device is trusted and online, the app quietly repeats the handshake (new challenge, signature and attestation) in the last days before expiry, so active stewards never notice. If the phone was offline past the 30 days, the steward signs in again and the handshake runs; check-ins saved on the phone wait and upload once it's trusted again.
+
+### 7. Every request
 
 The server subsystem attaches:
 
@@ -46,15 +59,15 @@ The server subsystem attaches:
 
 The server checks all four: token valid, device trusted and belongs to this member, signature matches the stored public key, timestamp within 5 minutes (blocks replays).
 
-### 6. Tokens are tied to the device
+### 8. Tokens are tied to the device
 
 - Refresh tokens only work together with the device's signature. Revoking a device stops it syncing at its next request, even if it still holds a token.
 
-### 7. Offline work
+### 9. Offline work
 
 - Records created offline carry `createdOnDeviceId`. At sync time the server checks the device's current status. A revoked device's pending uploads are not accepted (see open question 4).
 
-### 8. Managing devices
+### 10. Managing devices
 
 - Members can see their own devices and revoke a lost phone.
 - Admins can see and revoke any device, and approve pending ones.
@@ -66,11 +79,11 @@ The server checks all four: token valid, device trusted and belongs to this memb
 - `src/server`: asks membership's `CredentialsProvider` for the token and request signature; never reads keys itself.
 - Error codes `device_untrusted` and `device_revoked` (src/server/types.ts) tell the app to stop syncing and explain why.
 
-## Open questions
+## Decisions (2026-11-13)
 
-1. Should a new device be trusted automatically when attestation passes, or should every new device need admin approval?
-2. Is there a limit on devices per member (for example 3)?
-3. Shared phones: will several stewards ever use one phone? If so, we need fast switching between members on one device.
-4. Check-ins from a revoked device that never synced: reject them, or hold them for an admin to review?
-5. Should we block phones that fail attestation entirely, or allow them as pending (current proposal)?
-6. Should devices re-verify periodically, for example every 30 days?
+1. New device trusted automatically once attestation passes. ✔
+2. No limit on devices per member. ✔
+3. Shared phones not supported. ✔
+4. Check-ins from a revoked device that never synced: **still open**. Recommendation: hold them for an admin to review rather than throw them away.
+5. Failed attestation: device stays pending (admin can approve). ✔
+6. Re-verification: device credentials expire after 30 days; the app renews quietly before then. ✔

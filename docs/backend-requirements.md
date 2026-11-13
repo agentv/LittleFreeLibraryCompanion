@@ -2,7 +2,7 @@
 
 The backend and infrastructure are a separate project. This document is the contract between the two: what this app needs from the backend, and (below) what the backend project needs from us. Update it whenever either side changes.
 
-Status: draft, updated 2026-11-10.
+Status: draft, updated 2026-11-13.
 
 ## Context
 
@@ -31,6 +31,7 @@ Status: draft, updated 2026-11-10.
 ### 3. Membership and permissions (used by `src/membership`)
 
 - R11. Email sign-in (magic link or one-time code). Apple/Google sign-in later.
+- R11a. **Web sign-up form** run by the backend, usable in a phone browser. Accounts are created there, not in the app. New accounts start `pending`. The app links to this form; it has no sign-up screen of its own.
 - R12. Roles: `steward`, `admin`.
 - R13. Member status: `pending` (signed up, awaiting approval), `active`, `suspended`. Admins approve new members, so inputs to the data set are curated.
 - R14. Only active members can create libraries, visits, comments or attachments. Pending and suspended members can sign in and read. New libraries do **not** need admin approval: any active steward can add one, and admins can edit or remove it afterwards.
@@ -56,9 +57,10 @@ Status: draft, updated 2026-11-10.
 ### 6. Devices (see [device-trust.md](device-trust.md))
 
 - R27. Device registration: issue one-time challenges; register a device with its public key, signed challenge and attestation token; link it to the member.
-- R28. Verify Apple App Attest and Google Play Integrity tokens. Passed → `trusted` (if the member is active); failed or unavailable → `pending` for admin approval.
+- R28. Verify Apple App Attest and Google Play Integrity tokens. Passed → `trusted` straight away; failed or unavailable → `pending` until an admin approves. No limit on devices per member. One member per device (no shared phones).
 - R29. On every request, check the access token, that the device is trusted and belongs to the member, the request signature against the stored public key, and a timestamp within 5 minutes.
 - R30. Refresh tokens are bound to the device; revoking a device stops it at its next request.
+- R30a. Device trust **expires 30 days** after the last successful verification. Support re-verification (new challenge, signature and attestation) before expiry without signing in again, and after expiry with a fresh sign-in. Return `device_untrusted` with an `expired` reason so the app can renew.
 - R31. Device endpoints: list my devices, revoke mine; admins list, approve and revoke any.
 - R32. Stamp every record and change-history entry with the device it came from. Handle content from revoked devices per device-trust.md open question 4.
 
@@ -77,4 +79,4 @@ The backend project adds items here as it makes decisions that affect the app (f
 ## Open questions
 
 - Q4. How long is change history kept, and do stewards see a library's history or only admins?
-- Q5–Q10. Device trust questions, listed in [device-trust.md](device-trust.md).
+- Q5. Check-ins from a revoked device that never synced: reject, or hold for admin review (recommended)? See [device-trust.md](device-trust.md).
