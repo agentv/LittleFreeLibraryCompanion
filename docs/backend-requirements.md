@@ -2,12 +2,14 @@
 
 The backend and infrastructure are a separate project. This document is the contract between the two: what this app needs from the backend, and (below) what the backend project needs from us. Update it whenever either side changes.
 
-Status: draft, updated 2026-11-13.
+Status: draft, updated 2026-11-13 (backend language added).
 
 ## Context
 
 - Hosting: self-hosted Supabase (Postgres, Auth, API) on the owner's own servers. No recurring hosted-service fees.
 - Media: photos and audio in the owner's Amazon S3.
+- Custom server logic (attestation checks, address lookup, sync and permission rules, change history helpers) is written in **Node.js + TypeScript** (decided 2026-11-13). The app is TypeScript too, so the data shapes in `src/types/models.ts` and the request/response types can be shared, for example as a small shared package both projects use, instead of being written twice.
+- Hosting for that code: likely AWS, not decided yet.
 - The client is offline-first: it creates records on the device with its own UUIDs and syncs later. The data model is in [features-and-data-model.md](features-and-data-model.md) and `src/types/models.ts`.
 
 ## What the app needs from the backend
