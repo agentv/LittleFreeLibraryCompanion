@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "LFL Steward Companion",
-    "slug": "lfl-steward-companion",
+    "slug": "little-free-library-companion",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
