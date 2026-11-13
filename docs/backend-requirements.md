@@ -58,7 +58,7 @@ Status: draft, updated 2026-11-13 (backend language added).
 
 - R22. **Address lookup happens on the server during sync.** The app sends only coordinates, accuracy and location source. When a library arrives (or its coordinates change) with `address_status = pending`, the server reverse-geocodes it, fills the address fields, sets `address_status` to `resolved` (or `failed`), and returns it on the next pull.
 - R23. Never overwrite an address a person typed (`address_status = manual`). If coordinates change on a manual address, keep the address and flag it for review.
-- R24. The geocoding service is replaceable on the server and, to avoid per-request fees, should be self-hostable (for example Nominatim or Pelias over OpenStreetMap data). Cache results. Note: a self-hosted geocoder covering a large area needs far more memory and disk than the shared server has, so see Q7.
+- R24. Address lookup uses a **small hosted reverse-geocoding service** (decided 2026-11-13; coverage can't be limited to one region, so self-hosting is out). It sits behind a replaceable geocoder interface in the Node service, so the provider can be swapped. Every result is **saved in our database** with the library, and lookups are cached by rounded coordinates so the same spot is never paid for twice. The provider's API key stays on the server. Choose a provider whose terms allow storing results permanently (some don't), with a free or low-cost tier that covers our volume.
 - R25. Location sanity checks: flag (don't reject) visits more than 150 m from their library, positions reported as mocked, and low-accuracy fixes (over 50 m), so admins can review.
 - R26. Accept visits with no position. Libraries always have a position, from GPS or placed on a map (`location_source = manual_pin`).
 
@@ -88,5 +88,5 @@ The backend project adds items here as it makes decisions that affect the app (f
 
 - Q4. How long is change history kept, and do stewards see a library's history or only admins?
 - Q6. ~~Where does Postgres run?~~ Decided 2026-11-13: in the trimmed Supabase stack on the resized existing EC2 server, alongside WordPress (see Context).
-- Q7. Address lookup service: a self-hosted geocoder limited to the region we serve (small map extract), or a low-cost hosted geocoder with results cached in our database? The shared server can't hold a large geocoding database.
+- Q7. ~~Address lookup service?~~ Decided 2026-11-13: small hosted reverse-geocoding service behind a swappable interface, results stored in our database (R24).
 - Q5. Check-ins from a revoked device that never synced: reject, or hold for admin review (recommended)? See [device-trust.md](device-trust.md).
