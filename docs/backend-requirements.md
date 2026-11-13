@@ -9,7 +9,10 @@ Status: draft, updated 2026-11-13 (backend language added).
 - Hosting: self-hosted Supabase (Postgres, Auth, API) on the owner's own servers. No recurring hosted-service fees.
 - Media: photos and audio in the owner's Amazon S3.
 - Custom server logic (attestation checks, address lookup, sync and permission rules, change history helpers) is written in **Node.js + TypeScript** (decided 2026-11-13). The app is TypeScript too, so the data shapes in `src/types/models.ts` and the request/response types can be shared, for example as a small shared package both projects use, instead of being written twice.
-- Hosting for that code: likely AWS, not decided yet.
+- Hosting for that code (decided 2026-11-13): **AWS Lambda** first, written on a small portable framework (for example Hono or Fastify with a thin Lambda adapter) so it can move to a regular server later if traffic grows. Expected peak is small (about 15 stewards each sending 8 to 10 updates on one morning), so cost isn't a concern.
+- Photos and audio go **straight from the phone to S3** with short-lived signed links (R7); they never pass through Lambda.
+- Put a **Postgres connection pooler** in front of the database (Supabase's bundled pooler, Supavisor, or PgBouncer) so many short Lambda calls don't exhaust connections.
+- Where Postgres runs is still open (Q6).
 - The client is offline-first: it creates records on the device with its own UUIDs and syncs later. The data model is in [features-and-data-model.md](features-and-data-model.md) and `src/types/models.ts`.
 
 ## What the app needs from the backend
@@ -81,4 +84,5 @@ The backend project adds items here as it makes decisions that affect the app (f
 ## Open questions
 
 - Q4. How long is change history kept, and do stewards see a library's history or only admins?
+- Q6. Where does Postgres run? The existing WordPress EC2 instances run MySQL/MariaDB, which Supabase can't use; Supabase needs its own Postgres. Options: run the self-hosted Supabase stack (its own Postgres in Docker) on one of those instances if it has enough spare memory; a small separate instance; or Amazon RDS for Postgres (least upkeep, but some Supabase features expect their own Postgres build). Lambda must be able to reach it privately (same VPC).
 - Q5. Check-ins from a revoked device that never synced: reject, or hold for admin review (recommended)? See [device-trust.md](device-trust.md).
