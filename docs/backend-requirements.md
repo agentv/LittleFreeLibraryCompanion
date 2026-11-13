@@ -6,13 +6,16 @@ Status: draft, updated 2026-11-13 (backend language added).
 
 ## Context
 
-- Hosting: self-hosted Supabase (Postgres, Auth, API) on the owner's own servers. No recurring hosted-service fees.
+- Hosting: self-hosted Supabase (Postgres, Auth, API) on the owner's own servers. No per-user or per-GB hosted-service fees; the only added cost is the server resize below.
 - Media: photos and audio in the owner's Amazon S3.
 - Custom server logic (attestation checks, address lookup, sync and permission rules, change history helpers) is written in **Node.js + TypeScript** (decided 2026-11-13). The app is TypeScript too, so the data shapes in `src/types/models.ts` and the request/response types can be shared, for example as a small shared package both projects use, instead of being written twice.
-- Hosting for that code (decided 2026-11-13): **AWS Lambda** first, written on a small portable framework (for example Hono or Fastify with a thin Lambda adapter) so it can move to a regular server later if traffic grows. Expected peak is small (about 15 stewards each sending 8 to 10 updates on one morning), so cost isn't a concern.
-- Photos and audio go **straight from the phone to S3** with short-lived signed links (R7); they never pass through Lambda.
-- Put a **Postgres connection pooler** in front of the database (Supabase's bundled pooler, Supavisor, or PgBouncer) so many short Lambda calls don't exhaust connections.
-- Where Postgres runs is still open (Q6).
+- Hosting (decided 2026-11-13, replaces the earlier Lambda-first plan): **one of the owner's existing low-traffic EC2 servers, resized one step** (for example t3.small → t3.medium, about $15 a month more; it has about 2.6 GB free memory and 1 GB swap today). Everything for the backend runs there:
+  - a **trimmed self-hosted Supabase stack** in Docker, in its own folder with its own compose file: Postgres, Auth (sign-in), the REST API layer, Storage (signed S3 links) and the gateway in front of them. Realtime, analytics, the Studio dashboard and edge functions are left out unless a need appears.
+  - the **custom Node.js + TypeScript service** (attestation checks, address lookup, sync and permission rules), written on a small portable framework (for example Hono or Fastify) so it can later move to Lambda or its own server without a rewrite.
+- WordPress keeps its own MySQL/MariaDB on the same server; the two don't share a database.
+- Photos and audio still go **straight from the phone to S3** with short-lived signed links (R7); they never pass through the server.
+- Expected peak is small (about 15 stewards each sending 8 to 10 updates on one morning). The Node service keeps a small connection pool to Postgres; a separate pooler is only needed if the code moves to Lambda later.
+- Operations on the shared server: keep swap enabled (grow it to about 2 GB after resizing), set memory limits per container so the app can't starve WordPress, **back up both WordPress and Supabase** nightly to S3 with a tested restore (R17), and **monitor memory and disk** with alerts (for example CloudWatch agent).
 - The client is offline-first: it creates records on the device with its own UUIDs and syncs later. The data model is in [features-and-data-model.md](features-and-data-model.md) and `src/types/models.ts`.
 
 ## What the app needs from the backend
@@ -55,7 +58,7 @@ Status: draft, updated 2026-11-13 (backend language added).
 
 - R22. **Address lookup happens on the server during sync.** The app sends only coordinates, accuracy and location source. When a library arrives (or its coordinates change) with `address_status = pending`, the server reverse-geocodes it, fills the address fields, sets `address_status` to `resolved` (or `failed`), and returns it on the next pull.
 - R23. Never overwrite an address a person typed (`address_status = manual`). If coordinates change on a manual address, keep the address and flag it for review.
-- R24. The geocoding service is replaceable on the server and, to avoid per-request fees, should be self-hostable (for example Nominatim or Pelias over OpenStreetMap data). Cache results.
+- R24. The geocoding service is replaceable on the server and, to avoid per-request fees, should be self-hostable (for example Nominatim or Pelias over OpenStreetMap data). Cache results. Note: a self-hosted geocoder covering a large area needs far more memory and disk than the shared server has, so see Q7.
 - R25. Location sanity checks: flag (don't reject) visits more than 150 m from their library, positions reported as mocked, and low-accuracy fixes (over 50 m), so admins can review.
 - R26. Accept visits with no position. Libraries always have a position, from GPS or placed on a map (`location_source = manual_pin`).
 
@@ -84,5 +87,6 @@ The backend project adds items here as it makes decisions that affect the app (f
 ## Open questions
 
 - Q4. How long is change history kept, and do stewards see a library's history or only admins?
-- Q6. Where does Postgres run? The existing WordPress EC2 instances run MySQL/MariaDB, which Supabase can't use; Supabase needs its own Postgres. Options: run the self-hosted Supabase stack (its own Postgres in Docker) on one of those instances if it has enough spare memory; a small separate instance; or Amazon RDS for Postgres (least upkeep, but some Supabase features expect their own Postgres build). Lambda must be able to reach it privately (same VPC).
+- Q6. ~~Where does Postgres run?~~ Decided 2026-11-13: in the trimmed Supabase stack on the resized existing EC2 server, alongside WordPress (see Context).
+- Q7. Address lookup service: a self-hosted geocoder limited to the region we serve (small map extract), or a low-cost hosted geocoder with results cached in our database? The shared server can't hold a large geocoding database.
 - Q5. Check-ins from a revoked device that never synced: reject, or hold for admin review (recommended)? See [device-trust.md](device-trust.md).
