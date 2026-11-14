@@ -1,6 +1,6 @@
 # Backend requirements
 
-The backend and infrastructure are a separate project. This document is the contract between the two: what this app needs from the backend, and (below) what the backend project needs from us. Update it whenever either side changes.
+The backend lives in `server/` and the app in `mobile/`; they are developed independently. This document is the contract between the two: what the app needs from the backend, and (below) what the backend needs from the app. Update it whenever either side changes.
 
 Status: draft, updated 2026-11-13 (backend language added).
 
@@ -8,7 +8,7 @@ Status: draft, updated 2026-11-13 (backend language added).
 
 - Hosting: self-hosted Supabase (Postgres, Auth, API) on the owner's own servers. No per-user or per-GB hosted-service fees; the only added cost is the server resize below.
 - Media: photos and audio in the owner's Amazon S3.
-- Custom server logic (attestation checks, address lookup, sync and permission rules, change history helpers) is written in **Node.js + TypeScript** (decided 2026-11-13). The app is TypeScript too, so the data shapes in `src/types/models.ts` and the request/response types can be shared, for example as a small shared package both projects use, instead of being written twice.
+- Custom server logic (attestation checks, address lookup, sync and permission rules, change history helpers) is written in **Node.js + TypeScript** (decided 2026-11-13). The app is TypeScript too, so the data shapes in `mobile/src/types/models.ts` and the request/response types can be shared, for example as a small shared package both `mobile/` and `server/` depend on, instead of being written twice.
 - Hosting (decided 2026-11-13, replaces the earlier Lambda-first plan): **one of the owner's existing low-traffic EC2 servers, resized one step** (for example t3.small → t3.medium, about $15 a month more; it has about 2.6 GB free memory and 1 GB swap today). Everything for the backend runs there:
   - a **trimmed self-hosted Supabase stack** in Docker, in its own folder with its own compose file: Postgres, Auth (sign-in), the REST API layer, Storage (signed S3 links) and the gateway in front of them. Realtime, analytics, the Studio dashboard and edge functions are left out unless a need appears.
   - the **custom Node.js + TypeScript service** (attestation checks, address lookup, sync and permission rules), written on a small portable framework (for example Hono or Fastify) so it can later move to Lambda or its own server without a rewrite.
@@ -16,11 +16,11 @@ Status: draft, updated 2026-11-13 (backend language added).
 - Photos and audio still go **straight from the phone to S3** with short-lived signed links (R7); they never pass through the server.
 - Expected peak is small (about 15 stewards each sending 8 to 10 updates on one morning). The Node service keeps a small connection pool to Postgres; a separate pooler is only needed if the code moves to Lambda later.
 - Operations on the shared server: keep swap enabled (grow it to about 2 GB after resizing), set memory limits per container so the app can't starve WordPress, **back up both WordPress and Supabase** nightly to S3 with a tested restore (R17), and **monitor memory and disk** with alerts (for example CloudWatch agent).
-- The client is offline-first: it creates records on the device with its own UUIDs and syncs later. The data model is in [features-and-data-model.md](features-and-data-model.md) and `src/types/models.ts`.
+- The client is offline-first: it creates records on the device with its own UUIDs and syncs later. The data model is in [features-and-data-model.md](features-and-data-model.md) and `mobile/src/types/models.ts`.
 
 ## What the app needs from the backend
 
-### 1. Data and sync (used by `src/sync`)
+### 1. Data and sync (used by `mobile/src/sync`)
 
 - R1. Tables for libraries, visits, comments, attachments and members, matching the client data model. Primary keys are client-generated UUIDs; the server must accept them as-is.
 - R2. Upsert by id. Pushing the same record twice must be safe (idempotent).
@@ -29,14 +29,14 @@ Status: draft, updated 2026-11-13 (backend language added).
 - R5. Soft deletes only (deleted_at); no hard deletes from the client.
 - R6. Every library and visit is readable by any signed-in active member (libraries are not private).
 
-### 2. Media (used by `src/sync`)
+### 2. Media (used by `mobile/src/sync`)
 
 - R7. Short-lived signed upload URLs for S3, issued only to active members on trusted devices, so the app uploads files straight to S3.
 - R8. Short-lived signed download URLs (or a CDN path) for viewing photos and playing audio.
 - R9. Limits enforced server-side too: audio at most 90 seconds; photos resized by the client to a 1600 px long edge, so reject anything unreasonably large.
 - R10. Thumbnails are made on the phone (320 px long edge) and uploaded alongside each photo. The backend stores both and issues signed URLs for each; it does not need to generate thumbnails.
 
-### 3. Membership and permissions (used by `src/membership`)
+### 3. Membership and permissions (used by `mobile/src/membership`)
 
 - R11. Email sign-in (magic link or one-time code). Apple/Google sign-in later.
 - R11a. **Web sign-up form** run by the backend, usable in a phone browser. Accounts are created there, not in the app. New accounts start `pending`. The app links to this form; it has no sign-up screen of its own.
@@ -74,7 +74,7 @@ Status: draft, updated 2026-11-13 (backend language added).
 
 ## Requirements from the backend
 
-The backend project adds items here as it makes decisions that affect the app (for example API versions, rate limits, file-size limits, auth flow details). Each entry: date, requirement, what the app must change.
+The server side adds items here as it makes decisions that affect the app (for example API versions, rate limits, file-size limits, auth flow details). Each entry: date, requirement, what the app must change.
 
 - (none yet)
 

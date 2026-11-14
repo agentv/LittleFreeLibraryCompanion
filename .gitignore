@@ -36,9 +36,12 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# generated native folders (mobile app)
+/mobile/ios
+/mobile/android
+
+# server build output
+/server/dist/
 
 # Design work stays local (not in the remote repo)
 /design/
