@@ -31,7 +31,10 @@ export function syncRoutes(deps: Deps) {
     return c.json(result);
   });
 
-  app.get('/pull', requireDevice(deps, 'trusted'), async (c) => {
+  // Reads are open to any registered, non-removed device, so a steward on a phone
+  // waiting for approval can still see the libraries (Q11, decided 2026-11-14).
+  // Pushes from such a phone are still held, and uploads still need trust.
+  app.get('/pull', requireDevice(deps, 'registered'), async (c) => {
     let cursor: string;
     try {
       cursor = parseCursor(c.req.query('cursor'));

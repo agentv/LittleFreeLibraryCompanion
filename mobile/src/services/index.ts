@@ -140,9 +140,10 @@ export async function createServices(): Promise<Services> {
         ? 'Your account is waiting for an admin to approve it. You can look around, but check-ins wait until then.'
         : 'Your account is suspended, so new check-ins stay on this phone.'
       : !trusted
-        ? 'This phone is waiting for an admin to approve it. Check-ins upload now and wait for that approval.'
+        ? 'This phone is waiting for an admin to approve it. You can see the libraries, and check-ins upload now and wait for that approval.'
         : null;
-    return { push: active, pull: trusted, upload: active && trusted, reason };
+    // Any registered, non-removed phone may pull (Q11), so a pending phone still sees the libraries.
+    return { push: active, pull: true, upload: active && trusted, reason };
   };
 
   const services: Services = {

@@ -91,6 +91,8 @@ The server side adds items here as it makes decisions that affect the app (for e
   - **Pull:** `GET /v1/sync/pull?cursor=<opaque>` returns `{ changes, cursor, hasMore, serverTime }`. Repeat while `hasMore`. Rows include `updatedAt`. Visits also include `flagFarFromLibrary`, `flagLowAccuracy` and `flagMocked`, and attachments include `createdBy`. No cursor means from the start.
   - **Media:** sync the visit row first, then `POST /v1/media/upload-urls { attachmentId, visitId, kind, mimeType }`. It returns presigned POSTs `{ url, fields, key, expiresAt }` for the file and, for photos, the thumbnail. Send a multipart form with the fields, then `file`. Then push the attachment with `storagePath` (and `thumbnailStoragePath`) set to those keys, and the server checks the files are there. Limits: photo 3 MB, thumbnail 200 KB (JPEG), audio 2 MB and 90 s. `POST /v1/media/download-urls { paths[] }` returns `{ urls: { path: url }, expiresAt }` (1 hour).
 
+- 2026-11-14, Q11: `GET /v1/sync/pull` now accepts any registered device that hasn't been removed (pending, failed attestation or expired), not only trusted ones. A removed device still gets `device_revoked`. `/media/*` and admin calls still need a trusted device, and pushes from untrusted devices are still held. What the app must change: let a pending or expired phone pull (done in the app's sync gate).
+
 ## What the app does (first app build, 2026-11-14)
 
 How `mobile/` uses the contract above, so the server side can check its assumptions:
@@ -102,7 +104,7 @@ How `mobile/` uses the contract above, so the server side can check its assumpti
 - **Media:** photos are JPEG (1600 px long edge, quality 0.8) with a JPEG thumbnail (320 px); voice notes are `audio/mp4` (.m4a) from the phone's recorder, at most 90 s.
 - **Visits** send `positionMocked` when the phone says the position may be faked.
 - **Admin screens** in the app use `GET/POST /admin/members`, `/admin/devices` and `/admin/review` (open items only).
-- **Gate:** a member who isn't `active` doesn't push (their check-ins wait on the phone). A pending phone pushes (rows are held) but can't pull or upload files, because `GET /sync/pull` and `/media/*` need a trusted device.
+- **Gate:** a member who isn't `active` doesn't push (their check-ins wait on the phone). A pending or expired phone pulls and pushes (its rows are held) but can't upload files, because `/media/*` needs a trusted device. A removed phone does none of these.
 
 ## Decisions on earlier questions (2026-11-09)
 
@@ -118,5 +120,5 @@ How `mobile/` uses the contract above, so the server side can check its assumpti
 - Q5. ~~Check-ins from a revoked device that never synced?~~ Decided 2026-11-14: held for admin review, as for any untrusted device (R32a).
 - Q8. ~~Does the app call the Supabase REST layer or the Node service?~~ Decided 2026-11-14: the Node service only (see Context).
 - Q9. Email sender for sign-in codes (R19): Amazon SES is the suggestion (pay per use, no monthly fee), but it's a new service, so it needs the owner's OK.
-- Q11. (Raised by the first app build, 2026-11-14.) A new steward's phone is pending until an admin approves it, and `GET /v1/sync/pull` needs a trusted device, so until then the app shows no libraries at all and the steward can't pick one to check in at. R6 says every signed-in active member can read every library. Suggested: let pull answer for any registered, non-revoked device (reads only; pushes stay held). Needs a server change, plus a one-line change to the app's sync gate (`mobile/src/services/index.ts`).
+- Q11. ~~Can a phone waiting for approval read the libraries?~~ Decided 2026-11-14: yes. `GET /v1/sync/pull` answers for any registered, non-removed device (reads only); pushes from untrusted devices stay held and media still needs a trusted device. See the 2026-11-14 entry under "Requirements from the backend".
 - Q10. Apple App Attest and Google Play Integrity verifiers need the Apple Team ID, the app's bundle id, a Google Cloud project and a Play Console app. Until they exist, every new device registers as pending and an admin approves it.
