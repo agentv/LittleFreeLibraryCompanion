@@ -13,14 +13,14 @@ export interface Member {
   email: string;
   role: UserRole;
   status: MemberStatus;
-  createdAt: string;
-  approvedAt: string | null;
-  approvedBy: UUID | null;
+  /** Admin lists include these; GET /v1/me does not. */
+  createdAt?: string;
+  statusReason?: string | null;
 }
 
 export interface Session {
   member: Member;
-  /** Token the sync subsystem passes to the backend. */
+  /** Token the server subsystem passes to the backend. */
   accessToken: string;
   expiresAt: string;
 }
@@ -41,26 +41,53 @@ export type Permission =
 export interface AuthProvider {
   /** Web sign-up form to open in the browser for people without an account. */
   readonly signUpUrl: string;
-  /** Send a sign-in link or code to the email address. */
+  /** Send a one-time sign-in code to the email address. */
   requestSignIn(email: string): Promise<void>;
-  /** Complete sign-in from the link/code. */
-  completeSignIn(token: string): Promise<Session>;
+  /** Complete sign-in with the emailed code. */
+  completeSignIn(email: string, code: string): Promise<Session>;
   getSession(): Promise<Session | null>;
+  /** Fetch the member again (role and status change when an admin acts). */
+  refreshMember(): Promise<Member | null>;
+  /** Clears tokens. Device keys are wiped by DeviceIdentity.reset. */
   signOut(): Promise<void>;
   onSessionChange(listener: (session: Session | null) => void): () => void;
 }
 
+/** A change waiting for an admin: a held push or an address conflict (backend R22a, R32a). */
+export interface ReviewItem {
+  id: UUID;
+  kind: 'held_change' | 'address_conflict';
+  status: 'open' | 'accepted' | 'rejected';
+  table: 'libraries' | 'visits' | 'comments' | 'attachments';
+  recordId: UUID;
+  memberId: UUID;
+  deviceId: UUID | null;
+  reason: string | null;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
 /** Admin actions on members. One implementation per backend. */
 export interface MemberDirectory {
-  listMembers(filter?: { status?: MemberStatus; role?: UserRole }): Promise<Member[]>;
+  listMembers(filter?: { status?: MemberStatus }): Promise<Member[]>;
   approve(memberId: UUID): Promise<Member>;
   suspend(memberId: UUID, reason: string): Promise<Member>;
   setRole(memberId: UUID, role: UserRole): Promise<Member>;
+  listDevices(filter?: { status?: 'pending' | 'trusted' | 'revoked' }): Promise<import('../types/models').Device[]>;
+  approveDevice(deviceId: UUID): Promise<void>;
+  revokeDevice(deviceId: UUID): Promise<void>;
+  listReview(): Promise<ReviewItem[]>;
+  acceptReview(id: UUID, note?: string): Promise<void>;
+  rejectReview(id: UUID, note?: string): Promise<void>;
 }
 
 /** What the rest of the app uses. */
 export interface Membership {
   readonly auth: AuthProvider;
   readonly directory: MemberDirectory;
+  readonly device: import('./devices').DeviceIdentity;
+  readonly devices: import('./devices').DeviceRegistry;
+  /** Hand this to the server subsystem. */
+  readonly credentials: import('../server').CredentialsProvider;
   can(member: Member, permission: Permission): boolean;
 }

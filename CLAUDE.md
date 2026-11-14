@@ -27,7 +27,7 @@ Code paths below are inside `mobile/` unless they say otherwise.
 - Location: the check-in never blocks on location; visits may have no position. New libraries need a position from GPS or a pin placed on a map. Handle permission denied, location off, no fix, low accuracy, stale and mocked positions (`src/location/index.ts`).
 - Addresses: the **steward** enters or confirms every street address; nothing else may set it. Server-suggested addresses are a **nice-to-have** behind `FEATURES.addressSuggestions`: the app must work fully with the switch off, so no code path may depend on suggestions. A library can be saved with `addressStatus: 'missing'` and the app reminds the steward.
 - Accounts are created on the backend's web sign-up form, never in the app; the app only signs in (with a link to the form).
-- Devices (`docs/device-trust.md`, decided): hardware-backed key + App Attest / Play Integrity; trusted as soon as attestation passes, pending if it fails; no device limit; no shared phones; trust expires after 30 days and the app renews it quietly before then; requests are signed; devices can be removed. Every record carries `createdOnDeviceId`.
+- Devices (`docs/device-trust.md`, decided): hardware-backed key + App Attest / Play Integrity (first build, decided 2026-11-14: a P-256 key in the phone's secure storage, signing in app code, so it runs in Expo Go; swap behind `DeviceKeyStore` when attestation lands); trusted as soon as attestation passes, pending if it fails; no device limit; no shared phones; trust expires after 30 days and the app renews it quietly before then; requests are signed; devices can be removed. Every record carries `createdOnDeviceId`.
 - Membership curates contributors: members are `pending` until an admin approves them, then `active`; admins can `suspend`. Only active members can submit.
 - Users are stewards and admins. Everyone signed in can see every library. You can edit what you created; admins can edit anything (`canEdit` in `src/types/models.ts`).
 - Data: Library → Visit → Attachment (photo or audio) and Comment. Photo roles: shelf, establishing, location (at most one per role per visit). Condition fields live on Visit.
@@ -42,13 +42,17 @@ Code paths below are inside `mobile/` unless they say otherwise.
 ## Layout
 
 - `mobile/`: the Expo app.
-  - `App.tsx`, `index.ts`: Expo entry (blank template; move to Expo Router `mobile/src/app/` when screens are added).
+  - `src/app/`: screens (Expo Router; entry is `expo-router/entry`).
+  - `src/services/`: the one place adapters are chosen (real backend or demo mode), auto-sync, React hooks.
+  - `src/features/`: check-in draft and records, capture helpers, summaries, wizard steps.
+  - `src/theme/`, `src/ui/`: theme object and UI parts.
   - `src/types/models.ts`: data model types.
-  - `src/config/limits.ts`: product limits.
-  - `src/sync/`: sync subsystem (contract only so far; adapters not built).
-  - `src/membership/`: membership subsystem (contract, permission rules, device trust contracts in `devices.ts`; adapters not built).
-  - `src/server/`: the app's client for the backend (contract only). Not to be confused with the top-level `server/`.
-  - `src/location/`: location subsystem (contract and problem handling; adapter not built).
+  - `src/config/`: product limits (`limits.ts`), sync timing, per-build env (`env.ts`).
+  - `src/sync/`: sync subsystem (in-memory store over SQLite, engine, Node service / S3 / demo adapters).
+  - `src/membership/`: membership subsystem (sign-in, permissions, device key and trust, admin directory; Node service, secure-store and demo adapters).
+  - `src/server/`: the app's client for the backend (fetch adapter, request signing). Not to be confused with the top-level `server/`.
+  - `src/location/`: location subsystem (expo-location adapter, problem handling, distance).
+  - `test/`: Node tests (`npm test`).
 - `server/`: the backend. `migrations/` (SQL schema, row-level security, history triggers), `src/` (Hono service: `http/context.ts` request pipeline, `auth`, `devices`, `sync`, `media`, `admin`, `signup`), `test/` (integration tests against a real Postgres), `docker/` (compose stack), `scripts/` (backups). See `server/README.md`.
 - `docs/`: planning docs shared by both. `design/`: local-only design notes.
 
@@ -59,9 +63,12 @@ Mobile (from `mobile/`):
 ```bash
 npm install
 npx expo start
-npx tsc --noEmit   # typecheck
+npm run typecheck  # app and tests
 npx expo lint      # lint
+npm test           # Node tests
 ```
+
+With no `EXPO_PUBLIC_API_URL` the app runs in demo mode (code 123456).
 
 Server (from `server/`):
 

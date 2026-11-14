@@ -2,24 +2,56 @@
   "expo": {
     "name": "LFL Steward Companion",
     "slug": "little-free-library-companion",
+    "scheme": "lflsteward",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FBF6F1",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos of the library on each check-in.",
+        "NSMicrophoneUsageDescription": "Record voice notes about the library.",
+        "NSLocationWhenInUseUsageDescription": "Find the library you're at and record where each check-in happened.",
+        "NSPhotoLibraryUsageDescription": "Add photos you already took of the library."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FBF6F1",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": ["CAMERA", "RECORD_AUDIO", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-audio",
+        { "microphonePermission": "Record voice notes about the library." }
+      ],
+      [
+        "expo-camera",
+        { "cameraPermission": "Take photos of the library on each check-in.", "recordAudioAndroid": false }
+      ],
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "Find the library you're at and record where each check-in happened." }
+      ],
+      [
+        "expo-image-picker",
+        { "photosPermission": "Add photos you already took of the library." }
+      ],
+      "expo-font",
+      "expo-web-browser"
+    ]
   }
 }

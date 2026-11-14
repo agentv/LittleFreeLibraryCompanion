@@ -88,12 +88,18 @@ export interface Visit {
   longitude: number | null;
   locationAccuracyM: number | null;
   locationSource: LocationSource | null;
+  /** The phone reported the position as possibly faked (backend R25). */
+  positionMocked?: boolean | null;
   createdOnDeviceId: UUID;
   /** Condition check (optional wizard step). */
   stockLevel: StockLevel | null;
   condition: ConditionLevel | null;
   doorOk: boolean | null;
   itemsRemoved: boolean | null;
+  /** Set by the server on pull (backend R25); flags for admins, never blocks. */
+  flagFarFromLibrary?: boolean;
+  flagLowAccuracy?: boolean;
+  flagMocked?: boolean;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
   deletedAt: ISODateTime | null;
@@ -143,7 +149,11 @@ export interface Attachment {
   longitude: number | null;
   /** Device-only field. */
   uploadStatus: UploadStatus;
+  /** Set by the server on pull. */
+  createdBy?: UUID;
   createdAt: ISODateTime;
+  /** Set by the server on pull. */
+  updatedAt?: ISODateTime;
   deletedAt: ISODateTime | null;
 }
 
@@ -182,8 +192,8 @@ export type DeviceStatus = 'pending' | 'trusted' | 'revoked';
 export interface Device {
   id: UUID;
   memberId: UUID;
-  /** Public half of a key pair kept in the phone's secure hardware. */
-  publicKey: string;
+  /** Public half of the device key (base64 SPKI). Not returned in device lists. */
+  publicKey?: string;
   platform: 'ios' | 'android';
   model: string | null;
   appVersion: string;

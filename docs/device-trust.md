@@ -16,6 +16,7 @@ This lets us curate inputs, cut off a lost or misused phone without touching the
 ### 1. First run: the device gets an identity
 
 - The app creates a **device id** (UUID) and a **key pair** in the phone's secure hardware (iOS Secure Enclave / Android Keystore). The private key never leaves the phone.
+- First build (decided 2026-11-14): so the app runs in Expo Go before the developer accounts exist, the P-256 key is kept in the phone's secure storage (Keychain / Keystore-encrypted) and signs in app code. The hardware-held key arrives with App Attest / Play Integrity in a development build, behind the same `DeviceKeyStore` interface. Until then attestation is "unavailable" and every phone registers as pending.
 
 ### 2. Account first, outside the app
 

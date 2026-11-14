@@ -1,7 +1,8 @@
 /**
  * Location subsystem contract: getting the phone's position and handling
  * everything that can go wrong. The phone never turns coordinates into an
- * address; the server does that during sync (docs/backend-requirements.md R22).
+ * address, and the server doesn't decide one during sync either: the steward
+ * enters or confirms it (docs/backend-requirements.md R22a).
  * Vendor code (expo-location) lives in src/location/adapters/<vendor>/.
  */
 import type { ISODateTime, LocationSource } from '../types/models';
@@ -13,6 +14,8 @@ export interface LocationFix {
   accuracyM: number | null;
   source: LocationSource;
   takenAt: ISODateTime;
+  /** The OS reported the position may be faked (Android). */
+  mocked?: boolean;
 }
 
 /**

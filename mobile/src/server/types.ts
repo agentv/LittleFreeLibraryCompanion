@@ -26,6 +26,11 @@ export interface CredentialsProvider {
     deviceId: string;
     signature: string;
   } | null>;
+  /**
+   * Called once when the server answers `unauthorized`. Returns true if a
+   * fresh access token is now available and the request should be retried.
+   */
+  onUnauthorized(): Promise<boolean>;
 }
 
 export type ServerErrorCode =
@@ -38,6 +43,8 @@ export type ServerErrorCode =
   | 'version_unsupported' // app too old; ask the steward to update
   | 'conflict'
   | 'rate_limited'
+  | 'bad_request' // the app sent something the server can't use
+  | 'not_found'
   | 'server_error';
 
 export interface ServerError {
@@ -51,9 +58,22 @@ export interface ServerError {
 
 export type ServerResult<T> = { ok: true; data: T } | { ok: false; error: ServerError };
 
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export interface RequestOptions {
+  /** Send the access token (default true). */
+  auth?: boolean;
+  /** Sign the request with the device key (default true). */
+  signed?: boolean;
+  /** Retry once after a token refresh on `unauthorized` (default true). */
+  retryOnUnauthorized?: boolean;
+  /** Use this access token instead of asking the CredentialsProvider (right after sign-in). */
+  accessToken?: string;
+}
+
 export interface ServerClient {
   readonly config: ServerConfig;
-  request<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<ServerResult<T>>;
+  request<T>(method: HttpMethod, path: string, body?: unknown, options?: RequestOptions): Promise<ServerResult<T>>;
   /** Cheap reachability and version check. */
   health(): Promise<ServerResult<{ apiVersions: string[]; serverTime: string }>>;
 }
