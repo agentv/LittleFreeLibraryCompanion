@@ -105,18 +105,30 @@ describe('signed requests', () => {
   });
 
   it('reports pending, expired and revoked devices with their reason', async () => {
+    // Media links need a trusted device, so they show each reason.
+    const body = { paths: ['libraries/x/visits/y/z.jpg'] };
     const m = await h.member();
     const pending = await h.device(m, { status: 'pending' });
-    let r = await h.call('GET', '/v1/sync/pull', undefined, { member: m, device: pending });
+    let r = await h.call('POST', '/v1/media/download-urls', body, { member: m, device: pending });
     expect(r.json.error).toMatchObject({ code: 'device_untrusted', deviceReason: 'pending_approval' });
 
     const expired = await h.device(m, { expiresInDays: -1 });
-    r = await h.call('GET', '/v1/sync/pull', undefined, { member: m, device: expired });
+    r = await h.call('POST', '/v1/media/download-urls', body, { member: m, device: expired });
     expect(r.json.error).toMatchObject({ code: 'device_untrusted', deviceReason: 'expired' });
 
     const revoked = await h.device(m, { status: 'revoked' });
-    r = await h.call('GET', '/v1/sync/pull', undefined, { member: m, device: revoked });
+    r = await h.call('POST', '/v1/media/download-urls', body, { member: m, device: revoked });
     expect(r.json.error.code).toBe('device_revoked');
+  });
+
+  it('lets a pending or expired device pull, but not a removed one (Q11)', async () => {
+    const m = await h.member();
+    const pending = await h.device(m, { status: 'pending' });
+    expect((await h.call('GET', '/v1/sync/pull', undefined, { member: m, device: pending })).status).toBe(200);
+    const expired = await h.device(m, { expiresInDays: -1 });
+    expect((await h.call('GET', '/v1/sync/pull', undefined, { member: m, device: expired })).status).toBe(200);
+    const revoked = await h.device(m, { status: 'revoked' });
+    expect((await h.call('GET', '/v1/sync/pull', undefined, { member: m, device: revoked })).json.error.code).toBe('device_revoked');
   });
 });
 

@@ -2,7 +2,7 @@
 
 The backend lives in `server/` and the app in `mobile/`; they are developed independently. This document is the contract between the two: what the app needs from the backend, and (below) what the backend needs from the app. Update it whenever either side changes.
 
-Status: draft, updated 2026-11-14 (API shape, address conflicts and held inputs decided; first server build).
+Status: draft, updated 2026-11-14 (API shape, address conflicts and held inputs decided; first server build; first app build).
 
 ## Context
 
@@ -41,6 +41,7 @@ Status: draft, updated 2026-11-14 (API shape, address conflicts and held inputs 
 
 - R11. Email sign-in (magic link or one-time code). Apple/Google sign-in later.
 - R11a. **Web sign-up form** run by the backend, usable in a phone browser. Accounts are created there, not in the app. New accounts start `pending`. The app links to this form; it has no sign-up screen of its own.
+- R11b. **Account page on the web** (added 2026-11-14 by the first app build): the profile screen's "Edit account on the web" opens `https://<host>/account`, where a member changes their name or email. Not built on the server yet; until it is, the link lands on a 404.
 - R12. Roles: `steward`, `admin`.
 - R13. Member status: `pending` (signed up, awaiting approval), `active`, `suspended`. Admins approve new members, so inputs to the data set are curated.
 - R14. Only active members can create libraries, visits, comments or attachments. Pending and suspended members can sign in and read. New libraries do **not** need admin approval: any active steward can add one, and admins can edit or remove it afterwards.
@@ -90,6 +91,21 @@ The server side adds items here as it makes decisions that affect the app (for e
   - **Pull:** `GET /v1/sync/pull?cursor=<opaque>` returns `{ changes, cursor, hasMore, serverTime }`. Repeat while `hasMore`. Rows include `updatedAt`. Visits also include `flagFarFromLibrary`, `flagLowAccuracy` and `flagMocked`, and attachments include `createdBy`. No cursor means from the start.
   - **Media:** sync the visit row first, then `POST /v1/media/upload-urls { attachmentId, visitId, kind, mimeType }`. It returns presigned POSTs `{ url, fields, key, expiresAt }` for the file and, for photos, the thumbnail. Send a multipart form with the fields, then `file`. Then push the attachment with `storagePath` (and `thumbnailStoragePath`) set to those keys, and the server checks the files are there. Limits: photo 3 MB, thumbnail 200 KB (JPEG), audio 2 MB and 90 s. `POST /v1/media/download-urls { paths[] }` returns `{ urls: { path: url }, expiresAt }` (1 hour).
 
+- 2026-11-14, Q11: `GET /v1/sync/pull` now accepts any registered device that hasn't been removed (pending, failed attestation or expired), not only trusted ones. A removed device still gets `device_revoked`. `/media/*` and admin calls still need a trusted device, and pushes from untrusted devices are still held. What the app must change: let a pending or expired phone pull (done in the app's sync gate).
+
+## What the app does (first app build, 2026-11-14)
+
+How `mobile/` uses the contract above, so the server side can check its assumptions:
+
+- **Base URL** comes from `EXPO_PUBLIC_API_URL` (the origin, no `/v1`). The app signs the path as `/v1/...` plus the query, so a reverse proxy must pass paths through unchanged.
+- **Sign-in:** `/auth/code`, `/auth/verify`, then `GET /me` with the new token. Refresh is signed and tried once on any `unauthorized`; if it fails for a reason other than being offline, the app asks the steward to sign in again (the device key and unsent work stay).
+- **Device:** registers right after sign-in with `attestationToken: null` (attestation unavailable in this build). Renews with `/devices/verify` from 5 days before `trustExpiresAt`, or straight away after a `device_untrusted` / `expired`. While the phone is pending it checks `GET /me/devices` on every sync to notice approval.
+- **Push:** rows are sent per table, parents first, at most 200 per call. `held` rows are kept and not resent; `flagged` rows are shown as waiting for an admin; `rejected` rows are shown with the reason and not resent until edited, except `parent_missing` and `file_missing`, which are retried. Attachments go first with `storagePath: null`, then again with the keys after the files are in S3.
+- **Media:** photos are JPEG (1600 px long edge, quality 0.8) with a JPEG thumbnail (320 px); voice notes are `audio/mp4` (.m4a) from the phone's recorder, at most 90 s.
+- **Visits** send `positionMocked` when the phone says the position may be faked.
+- **Admin screens** in the app use `GET/POST /admin/members`, `/admin/devices` and `/admin/review` (open items only).
+- **Gate:** a member who isn't `active` doesn't push (their check-ins wait on the phone). A pending or expired phone pulls and pushes (its rows are held) but can't upload files, because `/media/*` needs a trusted device. A removed phone does none of these.
+
 ## Decisions on earlier questions (2026-11-09)
 
 - New libraries do not need admin approval (R14).
@@ -104,4 +120,5 @@ The server side adds items here as it makes decisions that affect the app (for e
 - Q5. ~~Check-ins from a revoked device that never synced?~~ Decided 2026-11-14: held for admin review, as for any untrusted device (R32a).
 - Q8. ~~Does the app call the Supabase REST layer or the Node service?~~ Decided 2026-11-14: the Node service only (see Context).
 - Q9. Email sender for sign-in codes (R19): Amazon SES is the suggestion (pay per use, no monthly fee), but it's a new service, so it needs the owner's OK.
+- Q11. ~~Can a phone waiting for approval read the libraries?~~ Decided 2026-11-14: yes. `GET /v1/sync/pull` answers for any registered, non-removed device (reads only); pushes from untrusted devices stay held and media still needs a trusted device. See the 2026-11-14 entry under "Requirements from the backend".
 - Q10. Apple App Attest and Google Play Integrity verifiers need the Apple Team ID, the app's bundle id, a Google Cloud project and a Play Console app. Until they exist, every new device registers as pending and an admin approves it.
