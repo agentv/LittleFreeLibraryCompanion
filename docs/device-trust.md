@@ -75,9 +75,9 @@ The server checks all four: token valid, device trusted and belongs to this memb
 
 ## Where it lives in the app
 
-- `src/membership/devices.ts`: `DeviceKeyStore`, `DeviceAttestation`, `DeviceRegistry`, `DeviceIdentity` contracts.
-- `src/server`: asks membership's `CredentialsProvider` for the token and request signature; never reads keys itself.
-- Error codes `device_untrusted` and `device_revoked` (src/server/types.ts) tell the app to stop syncing and explain why.
+- `mobile/src/membership/devices.ts`: `DeviceKeyStore`, `DeviceAttestation`, `DeviceRegistry`, `DeviceIdentity` contracts.
+- `mobile/src/server`: asks membership's `CredentialsProvider` for the token and request signature; never reads keys itself.
+- Error codes `device_untrusted` and `device_revoked` (mobile/src/server/types.ts) tell the app to stop syncing and explain why.
 
 ## Decisions (2026-11-13)
 

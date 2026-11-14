@@ -145,7 +145,7 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 
 ## 9. Architecture decisions (2026-11-09)
 
-- The app repo is client only. Backend/infrastructure (self-hosted Supabase, S3, backups, auth email) is a separate project. Contract: docs/backend-requirements.md in the app repo, including a section for requirements the backend project sends back.
+- ~~The app repo is client only.~~ Changed 2026-11-14: the repo holds both products, `mobile/` (the app) and `server/` (backend service and infrastructure), developed independently with their own dependencies and builds. Contract: docs/backend-requirements.md, including a section for requirements the server sends back.
 - Vendor-dependent parts are swappable subsystems behind interfaces: **sync** (local store, row sync, media upload) and **membership** (sign-in, roles, member status, permissions, curating who contributes).
 - Design work lives in a local-only design/ folder (gitignored); copy kept in /mnt/project-files/design/.
 
