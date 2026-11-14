@@ -1,6 +1,6 @@
 # Device verification and authentication
 
-Status: decided 2026-11-13 (Vincent), except open question 4.
+Status: decided 2026-11-13 (Vincent); question 4 decided 2026-11-14.
 
 ## Goal
 
@@ -65,7 +65,7 @@ The server checks all four: token valid, device trusted and belongs to this memb
 
 ### 9. Offline work
 
-- Records created offline carry `createdOnDeviceId`. At sync time the server checks the device's current status. A revoked device's pending uploads are not accepted (see open question 4).
+- Records created offline carry `createdOnDeviceId`. At sync time the server checks the device's current status. Rows from a device that isn't trusted, including a removed one, are held for an admin instead of applied (decision 4).
 
 ### 10. Managing devices
 
@@ -84,6 +84,6 @@ The server checks all four: token valid, device trusted and belongs to this memb
 1. New device trusted automatically once attestation passes. ✔
 2. No limit on devices per member. ✔
 3. Shared phones not supported. ✔
-4. Check-ins from a revoked device that never synced: **still open**. Recommendation: hold them for an admin to review rather than throw them away.
+4. Check-ins from a revoked device that never synced: **held for an admin to review** (2026-11-14), the same as anything from a device that isn't trusted (pending, failed attestation, expired). ✔
 5. Failed attestation: device stays pending (admin can approve). ✔
 6. Re-verification: device credentials expire after 30 days; the app renews quietly before then. ✔

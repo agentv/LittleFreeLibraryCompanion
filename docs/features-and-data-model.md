@@ -7,7 +7,7 @@ Date: 2026-11-09
 
 ### MVP
 - **Library list and map.** See the libraries you steward (or have visited) as a list and on a map.
-- **Add a library.** Name, optional charter number, a cover photo, GPS location captured automatically, and street address filled in from the GPS (reverse geocoding) with manual editing.
+- **Add a library.** Name, optional charter number, a cover photo, GPS location captured automatically (or a pin placed on a map), and a street address the steward enters or confirms (updated 2026-11-14; the address is never filled in from GPS).
 - **Municipal info.** Street address, city, county, state/province, postal code, country. Stored with the library, editable.
 - **Log a visit.** Each trip to a library is a *visit* with a timestamp, the GPS where you were standing, and any number of attachments.
 - **Photos.** Take or pick several photos at once; they are kept together as a group on that visit (and so on that library). Optional caption per photo.
@@ -59,7 +59,7 @@ Visit 1───* Comment 1───* Attachment (photo, via comment_id)
 - name, charter_number (optional), description
 - latitude, longitude, location_accuracy_m
 - address_line, city, county, region (state/province), postal_code, country
-- address_source: `geocoded` | `manual`
+- address_source: `typed` | `suggestion` (nullable); address_status: `missing` | `confirmed` (updated 2026-11-13; see section 13)
 - cover_photo_id → Attachment (nullable; if empty, use the latest establishing shot)
 - created_by → User, created_at, updated_at, deleted_at (soft delete)
 
@@ -158,8 +158,8 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 ## 11. Location, server and devices (2026-11-10)
 
 - **Location problems are handled on the phone:** permission denied, location turned off, no fix, low accuracy (over 50 m), stale cached position, mocked position. Each shows a plain message and offers retry, open Settings, or place the library on a map. A check-in never blocks on location; visits can be saved without a position. New libraries need a position (GPS or map pin).
-- **Address lookup on the server during sync**, using a self-hostable geocoder (no per-request fees).
-- New fields: Library `location_source` (gps / last_known / manual_pin) and `address_status` (pending / resolved / failed / manual); Visit `location_source`; every record `created_on_device_id`; new **Device** table.
+- ~~**Address lookup on the server during sync**, using a self-hostable geocoder.~~ Superseded: see section 13 and section 14.
+- New fields: Library `location_source` (gps / last_known / manual_pin) and `address_status` (~~pending / resolved / failed / manual~~, now missing / confirmed, see section 13); Visit `location_source`; every record `created_on_device_id`; new **Device** table.
 - **Server subsystem** on the client: the single, replaceable path to the backend.
 - **Device verification and authentication:** proposed design in the app repo's docs/device-trust.md (hardware-backed device key, App Attest / Play Integrity, signed requests, revocable devices). Six open questions there.
 
@@ -178,3 +178,11 @@ Why a single Attachment table: one upload queue, one gallery query, and adding a
 - It can be dropped at any time: a single switch turns it off, and nothing else depends on it.
 - A library can be saved without an address; it shows "Address needed" until the steward adds one.
 - Data model: Library `address_source` is typed or suggestion; `address_status` is missing or confirmed. Suggestions live in their own AddressSuggestion table.
+
+## 14. Addresses, held inputs and the server's API (2026-11-14)
+
+- The steward is the arbiter of the address. The position is always recorded and kept; converting it to an address is an afterthought, and nothing decides an address during sync.
+- The address a steward submits is used, unless it contradicts the confirmed address already on the library. Then the original stays and an admin resolves it from the review queue.
+- Inputs from devices that aren't trusted (pending, failed attestation, expired or removed) are held for an admin rather than applied or dropped.
+- The app talks only to the Node service; the backend stack is Postgres, Supabase Auth and that service.
+
