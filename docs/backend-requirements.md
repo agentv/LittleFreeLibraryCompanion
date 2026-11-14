@@ -2,15 +2,16 @@
 
 The backend lives in `server/` and the app in `mobile/`; they are developed independently. This document is the contract between the two: what the app needs from the backend, and (below) what the backend needs from the app. Update it whenever either side changes.
 
-Status: draft, updated 2026-11-13 (backend language added).
+Status: draft, updated 2026-11-14 (API shape, address conflicts and held inputs decided; first server build).
 
 ## Context
 
-- Hosting: self-hosted Supabase (Postgres, Auth, API) on the owner's own servers. No per-user or per-GB hosted-service fees; the only added cost is the server resize below.
+- **The app talks only to the Node service** (decided 2026-11-14), under `/v1`. The service checks the access token, the device and the request signature on every call, then reads and writes Postgres as that member so row-level security still applies. Supabase Auth handles sign-in, but the app reaches it only through the service, so token refresh can be tied to the device (R30).
+- Hosting: self-hosted Postgres and Supabase Auth on the owner's own servers. No per-user or per-GB hosted-service fees; the only added cost is the server resize below.
 - Media: photos and audio in the owner's Amazon S3.
 - Custom server logic (attestation checks, address lookup, sync and permission rules, change history helpers) is written in **Node.js + TypeScript** (decided 2026-11-13). The app is TypeScript too, so the data shapes in `mobile/src/types/models.ts` and the request/response types can be shared, for example as a small shared package both `mobile/` and `server/` depend on, instead of being written twice.
 - Hosting (decided 2026-11-13, replaces the earlier Lambda-first plan): **one of the owner's existing low-traffic EC2 servers, resized one step** (for example t3.small → t3.medium, about $15 a month more; it has about 2.6 GB free memory and 1 GB swap today). Everything for the backend runs there:
-  - a **trimmed self-hosted Supabase stack** in Docker, in its own folder with its own compose file: Postgres, Auth (sign-in), the REST API layer, Storage (signed S3 links) and the gateway in front of them. Realtime, analytics, the Studio dashboard and edge functions are left out unless a need appears.
+  - a **trimmed stack** in Docker (`server/docker/compose.yml`): Postgres and Supabase Auth (sign-in). ~~The REST API layer, Storage and the gateway~~ are dropped (2026-11-14): the Node service signs S3 links itself and is the only API, so they aren't needed. Realtime, analytics, Studio and edge functions stay out too.
   - the **custom Node.js + TypeScript service** (attestation checks, address lookup, sync and permission rules), written on a small portable framework (for example Hono or Fastify) so it can later move to Lambda or its own server without a rewrite.
 - WordPress keeps its own MySQL/MariaDB on the same server; the two don't share a database.
 - Photos and audio still go **straight from the phone to S3** with short-lived signed links (R7); they never pass through the server.
@@ -56,6 +57,7 @@ Status: draft, updated 2026-11-13 (backend language added).
 
 ### 5. Location and addresses
 
+- R22a. **Address conflicts (decided 2026-11-14).** Turning coordinates into an address is an afterthought: the server records and keeps the position but never decides an address during sync. The address a steward submits is the one used, unless the library already has a confirmed address and the new one contradicts it (including clearing it). Then the original stays in place, the rest of the change is applied, and the proposed address goes to the admin review queue. Admins' own edits apply directly. Differences only in spacing or capital letters don't count.
 - R22. **Nice-to-have, not a blocker (2026-11-13): address suggestions.** Stewards are responsible for entering each library's street address. As a convenience, when a library syncs with coordinates, the server may look up likely addresses and return up to 5 **suggestions** (ranked) on the next pull. Coordinates often match several addresses, so suggestions are only offered; the steward picks, edits or ignores them. This feature can be dropped at any time without affecting anything else.
 - R23. The server **never writes or changes a library's address**. Only a steward (or an admin) sets it. Suggestions live in their own table, separate from the library.
 - R24. If built, suggestions come from a **small hosted reverse-geocoding service** (coverage can't be limited to one region, so self-hosting is out), behind a replaceable geocoder interface in the Node service. Results are stored and cached by rounded coordinates so the same spot is never paid for twice. The API key stays on the server. The provider's terms must allow storing results.
@@ -70,13 +72,23 @@ Status: draft, updated 2026-11-13 (backend language added).
 - R30. Refresh tokens are bound to the device; revoking a device stops it at its next request.
 - R30a. Device trust **expires 30 days** after the last successful verification. Support re-verification (new challenge, signature and attestation) before expiry without signing in again, and after expiry with a fresh sign-in. Return `device_untrusted` with an `expired` reason so the app can renew.
 - R31. Device endpoints: list my devices, revoke mine; admins list, approve and revoke any.
-- R32. Stamp every record and change-history entry with the device it came from. Handle content from revoked devices per device-trust.md open question 4.
+- R32. Stamp every record and change-history entry with the device it came from.
+- R32a. **Held inputs (decided 2026-11-14).** Anything pushed from a device that isn't trusted (pending, failed attestation, trust expired, or removed) is held in the admin review queue, not applied and not thrown away. An admin accepts it (applied as the member who made it, from that device) or rejects it.
 
 ## Requirements from the backend
 
 The server side adds items here as it makes decisions that affect the app (for example API versions, rate limits, file-size limits, auth flow details). Each entry: date, requirement, what the app must change.
 
-- (none yet)
+- 2026-11-14, first server build (`server/`). What the app must do:
+  - **API base:** `https://<host>/v1`. `GET /v1/health` returns `{ apiVersions, serverTime }`. An unknown version answers 410 `version_unsupported`.
+  - **Errors:** `{ "error": { "code", "message", "deviceReason"? } }`. Codes are those in `mobile/src/server/types.ts`, plus `bad_request` (400) and `not_found` (404), which the app should add.
+  - **Sign-in:** `POST /v1/auth/code { email }` (always 204), `POST /v1/auth/verify { email, code }` returns `{ accessToken, refreshToken, expiresIn, userId }`. `POST /v1/auth/refresh { refreshToken }` must be signed by a registered, non-removed device of the same member. `GET /v1/me` returns the member (role and status) and needs only the access token. The sign-up form is at `https://<host>/signup`.
+  - **Device key:** ECDSA P-256, public key sent as base64 SPKI DER. Signatures are ECDSA SHA-256, base64 DER.
+  - **Every signed request** carries `Authorization: Bearer <access token>`, `X-Device-Id`, `X-Timestamp` (ISO 8601, within 5 minutes of server time) and `X-Signature` over the string `METHOD + "\n" + path with query + "\n" + hex SHA-256 of the exact body bytes ("" for none) + "\n" + X-Timestamp`.
+  - **Device registration:** `POST /v1/devices/challenge` returns `{ challenge, expiresAt }` (5 minutes, single use). `POST /v1/devices/register { deviceId, publicKey, platform, model, appVersion, challenge, challengeSignature, attestationToken }`, where challengeSignature signs the challenge string itself. This call is not request-signed. Renewal is `POST /v1/devices/verify { challenge, challengeSignature, attestationToken, appVersion }`, signed, before or after the 30-day expiry. `GET /v1/me/devices` and `POST /v1/me/devices/:id/revoke` are for managing your own devices.
+  - **Push:** `POST /v1/sync/push { changes: { libraries?, visits?, comments?, attachments? } }`, at most 500 rows, in the app's camelCase model. Device-only fields (`localUri`, `thumbnailLocalUri`, `uploadStatus`) and `updatedAt` are ignored. Visits may add `positionMocked: boolean` (new field, R25). The reply is `{ accepted[], rejected[{table,id,reason}], held[{table,id,reason}], flagged[{table,id,reason}] }`. Held rows are waiting for an admin: keep them on the phone, mark them as waiting, and don't resend them. Flagged means the row was applied but part of it (an address) is waiting for an admin. Rejection reasons: `invalid: …`, `owner_mismatch`, `device_mismatch`, `permission_denied`, `member_not_active`, `parent_missing`, `role_taken`, `file_missing`, `file_too_large`, `audio_too_long`, `unsupported_type`, `batch_too_large`.
+  - **Pull:** `GET /v1/sync/pull?cursor=<opaque>` returns `{ changes, cursor, hasMore, serverTime }`. Repeat while `hasMore`. Rows include `updatedAt`. Visits also include `flagFarFromLibrary`, `flagLowAccuracy` and `flagMocked`, and attachments include `createdBy`. No cursor means from the start.
+  - **Media:** sync the visit row first, then `POST /v1/media/upload-urls { attachmentId, visitId, kind, mimeType }`. It returns presigned POSTs `{ url, fields, key, expiresAt }` for the file and, for photos, the thumbnail. Send a multipart form with the fields, then `file`. Then push the attachment with `storagePath` (and `thumbnailStoragePath`) set to those keys, and the server checks the files are there. Limits: photo 3 MB, thumbnail 200 KB (JPEG), audio 2 MB and 90 s. `POST /v1/media/download-urls { paths[] }` returns `{ urls: { path: url }, expiresAt }` (1 hour).
 
 ## Decisions on earlier questions (2026-11-09)
 
@@ -86,7 +98,10 @@ The server side adds items here as it makes decisions that affect the app (for e
 
 ## Open questions
 
-- Q4. How long is change history kept, and do stewards see a library's history or only admins?
+- Q4. How long is change history kept, and do stewards see a library's history or only admins? Built default (2026-11-14): kept forever, admins only. Confirm or change.
 - Q6. ~~Where does Postgres run?~~ Decided 2026-11-13: in the trimmed Supabase stack on the resized existing EC2 server, alongside WordPress (see Context).
 - Q7. ~~Address lookup service?~~ Decided 2026-11-13: small hosted service behind a swappable interface (R24); the whole feature is a nice-to-have (R22).
-- Q5. Check-ins from a revoked device that never synced: reject, or hold for admin review (recommended)? See [device-trust.md](device-trust.md).
+- Q5. ~~Check-ins from a revoked device that never synced?~~ Decided 2026-11-14: held for admin review, as for any untrusted device (R32a).
+- Q8. ~~Does the app call the Supabase REST layer or the Node service?~~ Decided 2026-11-14: the Node service only (see Context).
+- Q9. Email sender for sign-in codes (R19): Amazon SES is the suggestion (pay per use, no monthly fee), but it's a new service, so it needs the owner's OK.
+- Q10. Apple App Attest and Google Play Integrity verifiers need the Apple Team ID, the app's bundle id, a Google Cloud project and a Play Console app. Until they exist, every new device registers as pending and an admin approves it.

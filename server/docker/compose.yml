@@ -1,0 +1,96 @@
+# Backend stack: Postgres + Supabase Auth (GoTrue) + the Node service.
+# The app talks only to the Node service (decided 2026-11-14), so the Supabase
+# REST layer, Storage and gateway are not run.
+#
+#   cd server/docker && cp ../.env.example .env && edit .env
+#   docker compose up -d --build
+#
+# Only the API (8080) and Auth's email-link endpoint (9999) are published, and
+# only on 127.0.0.1: the host's existing web server terminates HTTPS and proxies
+# to them (see ../README.md). Memory limits keep WordPress safe on the shared box.
+name: lfl
+
+services:
+  db:
+    image: postgres:16.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lfl
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:?set in .env}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?set in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lfl"]
+      interval: 5s
+      retries: 20
+    mem_limit: 512m
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=40"]
+
+  auth:
+    image: supabase/gotrue:v2.158.1
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: 9999
+      API_EXTERNAL_URL: ${PUBLIC_URL}/auth
+      GOTRUE_SITE_URL: ${PUBLIC_URL}/signup/done
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${AUTH_DB_PASSWORD}@db:5432/lfl?search_path=auth
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?set in .env}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      # Accounts come only from the sign-up form, which uses the admin API.
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_MAILER_OTP_EXP: 900
+      GOTRUE_SMTP_HOST: ${SMTP_HOST}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
+    ports:
+      - "127.0.0.1:9999:9999"
+    mem_limit: 128m
+
+  migrate:
+    build: ..
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_OWNER_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/lfl
+    command: ["node", "dist/db/migrate.js"]
+    restart: "no"
+
+  api:
+    build: ..
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      auth:
+        condition: service_started
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://lfl_api:${API_DB_PASSWORD}@db:5432/lfl
+      GOTRUE_URL: http://auth:9999
+      JWT_SECRET: ${JWT_SECRET}
+      PUBLIC_URL: ${PUBLIC_URL}
+      S3_BUCKET: ${S3_BUCKET:?set in .env}
+      AWS_REGION: ${AWS_REGION}
+      FEATURE_ADDRESS_SUGGESTIONS: ${FEATURE_ADDRESS_SUGGESTIONS:-off}
+    ports:
+      - "127.0.0.1:8080:8080"
+    mem_limit: 256m
+
+volumes:
+  db-data:

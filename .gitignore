@@ -45,3 +45,7 @@ yarn-error.*
 
 # Design work stays local (not in the remote repo)
 /design/
+
+# server secrets
+/server/docker/.env
+/server/.env

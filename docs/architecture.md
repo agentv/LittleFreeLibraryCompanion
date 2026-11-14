@@ -34,7 +34,7 @@ Rules:
 3. The app picks adapters in one place at startup, so swapping a backend is a one-line change plus a new adapter.
 4. Subsystems don't import each other's internals. Sync and membership adapters send requests through `mobile/src/server`; the server subsystem gets tokens and request signatures from membership through the `CredentialsProvider` interface.
 5. Shared data shapes live in `mobile/src/types/models.ts`.
-6. The phone never turns coordinates into an address. It sends coordinates and the server fills the address in during sync.
+6. The phone never turns coordinates into an address, and neither does the server during sync: the steward enters or confirms every address (backend R22a). Server suggestions are an optional nice-to-have.
 
 Paths in the diagram are inside `mobile/`. Note that `mobile/src/server` is the app's client for talking to the backend; the backend itself is the top-level `server/` folder.
 

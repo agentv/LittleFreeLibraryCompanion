@@ -32,7 +32,9 @@ Code paths below are inside `mobile/` unless they say otherwise.
 - Users are stewards and admins. Everyone signed in can see every library. You can edit what you created; admins can edit anything (`canEdit` in `src/types/models.ts`).
 - Data: Library → Visit → Attachment (photo or audio) and Comment. Photo roles: shelf, establishing, location (at most one per role per visit). Condition fields live on Visit.
 - Offline first: local SQLite is the source the UI reads; device-generated UUIDs; rows and files sync in separate queues.
-- Backend (`server/`): Node.js + TypeScript service with self-hosted Supabase on the owner's servers; media in Amazon S3 via signed upload URLs. No hosted/monthly services without asking.
+- Backend (`server/`): the app talks **only** to the Node.js + TypeScript service (Hono) under `/v1`; behind it are self-hosted Postgres and Supabase Auth on the owner's servers (no Supabase REST, Storage or gateway). Media in Amazon S3 via signed upload URLs. No hosted/monthly services without asking.
+- Address conflicts: a steward's address that contradicts the confirmed one on record is flagged for an admin, and the original stays. The server never decides an address during sync.
+- Pushes from devices that aren't trusted (pending, failed attestation, expired, removed) are held for an admin, never applied or dropped.
 - Voice notes are capped at 90 seconds (`src/config/limits.ts`).
 - Check-in is a 4-step wizard: Photos → Condition (optional) → Notes (optional) → Review and finish.
 - Look: "Neighborly" (Nunito, terracotta `#A8482A` on `#FBF6F1`, rounded). Themes (light, dark, high contrast) are required later, so keep colors in a theme object rather than hard-coded.
@@ -47,7 +49,7 @@ Code paths below are inside `mobile/` unless they say otherwise.
   - `src/membership/`: membership subsystem (contract, permission rules, device trust contracts in `devices.ts`; adapters not built).
   - `src/server/`: the app's client for the backend (contract only). Not to be confused with the top-level `server/`.
   - `src/location/`: location subsystem (contract and problem handling; adapter not built).
-- `server/`: the backend (Node.js + TypeScript service; placeholder entry point in `src/index.ts`). Supabase config, migrations and ops scripts will live here too.
+- `server/`: the backend. `migrations/` (SQL schema, row-level security, history triggers), `src/` (Hono service: `http/context.ts` request pipeline, `auth`, `devices`, `sync`, `media`, `admin`, `signup`), `test/` (integration tests against a real Postgres), `docker/` (compose stack), `scripts/` (backups). See `server/README.md`.
 - `docs/`: planning docs shared by both. `design/`: local-only design notes.
 
 ## Commands
@@ -67,6 +69,7 @@ Server (from `server/`):
 npm install
 npm run build
 npm run typecheck
+TEST_DATABASE_ADMIN_URL=postgres://postgres@localhost:5432/postgres npm test
 ```
 
 Run the checks for each side you changed before calling a task done.
